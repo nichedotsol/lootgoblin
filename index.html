@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Loot Goblin is a Three.js minigame about hunting compute tokens in a cursed terminal ruin."
+      content="Loot Goblin is a Three.js side-scroller about collecting loot across cursed compute worlds."
     />
     <title>Loot Goblin</title>
     <link rel="stylesheet" href="./styles.css" />
@@ -18,12 +18,12 @@
             <span class="goblin-sigil" aria-hidden="true"></span>
             <div>
               <h1>Compute Token Hunt</h1>
-              <p>Find the tokens. Don't get zapped.</p>
+              <p>Loot every world. Don't get zapped.</p>
             </div>
           </div>
           <div class="meter">
-            <span>Tokens</span>
-            <strong><span id="token-count">0</span>/15</strong>
+            <span>World.Loot</span>
+            <strong><span id="token-count">1.0</span></strong>
           </div>
           <div class="meter">
             <span>Score</span>
@@ -53,8 +53,8 @@
           <div class="keys move-keys"><span>Move</span><kbd>Up</kbd><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div>
           <div class="keys"><span>Dash</span><kbd>Shift</kbd></div>
           <div class="keys"><span>Avoid</span><span class="skull" aria-hidden="true"></span><small>Zaps</small></div>
-          <div class="keys"><span>Collect</span><span class="token-icon" aria-hidden="true"></span><small>Tokens</small></div>
-          <div class="keys directive"><span class="goblin-pixel" aria-hidden="true"></span><strong>Grab all tokens before time runs out!</strong></div>
+          <div class="keys"><span>Collect</span><span class="token-icon" aria-hidden="true"></span><small>Loot</small></div>
+          <div class="keys directive"><span class="goblin-pixel" aria-hidden="true"></span><strong>Grab loot and reach the portal shard!</strong></div>
           <div class="keys restart-keys"><button id="restart" type="button">Restart [R]</button><span class="tiny-goblin" aria-hidden="true"></span></div>
         </footer>
       </section>

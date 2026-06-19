@@ -1,6 +1,6 @@
 # Loot Goblin
 
-A tiny Three.js browser minigame about hunting compute tokens in a cursed terminal ruin.
+A tiny Three.js browser minigame about hunting compute tokens through side-scroller loot worlds.
 
 ## Play
 
@@ -14,16 +14,35 @@ Controls:
 
 ## Goal
 
-Collect all 15 compute tokens before time runs out. Audit beams burn time and score, so watch their rhythm and dash through the gaps.
+Collect loot, grab ability upgrades, and reach the portal shard before time runs out. Each portal advances to the next world.
+
+## World Model
+
+The side-scroller pass defines 10 worlds:
+
+1. Mossy Terminal Ruins
+2. Neon Data Cave
+3. Amber Audit Foundry
+4. Crystal Cache Forest
+5. Corrupted Firewall Swamp
+6. Deep Packet Mine
+7. Cloud Server Skybridges
+8. Glitch Market Alley
+9. Blacksite Vault Corridor
+10. Overclocked Core Chamber
+
+Difficulty adapts during a run from the current world, time pressure, and collection pace. Higher difficulty increases hazard rhythm pressure and world speed tuning.
+
+Loot includes score items and collection upgrades: magnet aura, speed boots, bigger satchel, scanner ping, shield battery, double-loot multiplier, time shard, jump booster, and portal shards.
 
 ## Tech
 
 This version is intentionally static and build-free:
 
 - HTML/CSS app shell
-- Three.js-rendered game world and hit surfaces
-- Generated transparent sprite sheets for the player, props, terrain, hazards, and collectibles
-- Cropped sprite assets layered into the Three.js scene as billboard props, floor decals, wall art, animated player states, and token pickups
+- Three.js-rendered side-scroller world, camera, physics, platforms, hazards, and pickups
+- Generated sprite atlas for 10 worlds with backgrounds, props, and modular platform tiles
+- Generated transparent loot/power-up and HUD sprite sheets
 - Three.js loaded as an ES module from jsDelivr
-- Authored artifact registries for compute tokens, ruin objects, and audit beams
+- Authored level data, loot tables, ability upgrades, and adaptive difficulty rules
 - No build step

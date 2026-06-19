@@ -9,200 +9,69 @@ const restart = document.querySelector("#restart");
 
 const keys = new Set();
 const clock = new THREE.Clock();
-const worldBounds = { minX: -11, maxX: 11, minZ: -5.7, maxZ: 5.7 };
-
-const colors = {
-  bg: 0x020604,
-  floor: 0x143018,
-  moss: 0x2f7b25,
-  stone: 0x5f695d,
-  darkStone: 0x1e2924,
-  green: 0x75ff66,
-  cyan: 0x35f5ff,
-  amber: 0xffba3b,
-  red: 0xff583f,
-  wood: 0x5a351b,
-};
-
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
-renderer.setClearColor(colors.bg);
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance", alpha: false });
+renderer.setClearColor(0x020604);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(colors.bg);
-scene.fog = new THREE.FogExp2(0x07120a, 0.035);
+scene.background = new THREE.Color(0x020604);
 
-const camera = new THREE.OrthographicCamera(-12, 12, 7, -7, 0.1, 100);
-camera.position.set(8.5, 8.5, 10.5);
-camera.lookAt(0, 0, 0.45);
+const camera = new THREE.OrthographicCamera(-12, 12, 6.75, -6.75, 0.1, 100);
+camera.position.set(0, 0, 10);
 
-const root = new THREE.Group();
-scene.add(root);
+const worldRoot = new THREE.Group();
+scene.add(worldRoot);
 
-const textureLoader = new THREE.TextureLoader();
-const spriteTextures = {};
-const spriteFiles = {
-  goblinIdle: "goblin_idle.png",
-  goblinWalkA: "goblin_walk_a.png",
-  goblinWalkB: "goblin_walk_b.png",
-  goblinDash: "goblin_dash.png",
-  terminalMain: "terminal_main.png",
-  terminalQuestion: "terminal_question.png",
-  crystalObelisk: "crystal_obelisk.png",
-  amberShrine: "amber_shrine.png",
-  auditEmitter: "audit_emitter.png",
-  signDepth: "sign_depth.png",
-  signDanger: "sign_danger.png",
-  greenCrystal: "green_crystal.png",
-  mushrooms: "mushrooms.png",
-  grassTuft: "grass_tuft.png",
-  leafCluster: "leaf_cluster.png",
-  wallShards: "wall_shards.png",
-  computeToken: "compute_token.png",
-  auditBeam: "audit_beam.png",
-  mossTile: "moss_tile.png",
-  stoneTile: "stone_tile.png",
-  runePlatform: "rune_platform.png",
-  caveWallStrip: "cave_wall_strip.png",
+const loader = new THREE.TextureLoader();
+const textures = {
+  goblinIdle: loadTexture("./assets/sprites/goblin_idle.png"),
+  goblinWalkA: loadTexture("./assets/sprites/goblin_walk_a.png"),
+  goblinWalkB: loadTexture("./assets/sprites/goblin_walk_b.png"),
+  goblinDash: loadTexture("./assets/sprites/goblin_dash.png"),
+  worlds: loadTexture("./assets/side-scroller/worlds-atlas.png"),
+  loot: loadTexture("./assets/side-scroller/loot-items.png"),
+  hud: loadTexture("./assets/side-scroller/hud.png"),
 };
 
-const spriteAspect = {
-  goblinIdle: 378 / 505,
-  goblinWalkA: 384 / 491,
-  goblinWalkB: 505 / 495,
-  goblinDash: 448 / 397,
-  terminalMain: 356 / 346,
-  terminalQuestion: 344 / 305,
-  crystalObelisk: 321 / 330,
-  amberShrine: 336 / 312,
-  auditEmitter: 336 / 341,
-  signDepth: 237 / 356,
-  signDanger: 222 / 362,
-  greenCrystal: 252 / 352,
-  mushrooms: 237 / 253,
-  grassTuft: 218 / 245,
-  leafCluster: 260 / 295,
-  wallShards: 304 / 284,
-  computeToken: 337 / 350,
-  auditBeam: 367 / 345,
-  mossTile: 386 / 329,
-  stoneTile: 377 / 320,
-  runePlatform: 392 / 305,
-  caveWallStrip: 369 / 363,
+const LEVELS = [
+  { name: "Mossy Terminal Ruins", tint: 0x75ff66, loot: ["computeToken", "dataGem", "cacheCrystal"], hazards: 3, speed: 1.0, gravity: 15.0 },
+  { name: "Neon Data Cave", tint: 0x35f5ff, loot: ["dataGem", "computeToken", "timeShard"], hazards: 4, speed: 1.07, gravity: 15.2 },
+  { name: "Amber Audit Foundry", tint: 0xffba3b, loot: ["packetIngot", "vaultKey", "computeToken"], hazards: 6, speed: 1.13, gravity: 15.6 },
+  { name: "Crystal Cache Forest", tint: 0x5dff8a, loot: ["cacheCrystal", "dataGem", "treasurePouch"], hazards: 5, speed: 1.16, gravity: 15.0 },
+  { name: "Corrupted Firewall Swamp", tint: 0x62ff35, loot: ["glitchRelic", "cacheCrystal", "shieldBattery"], hazards: 7, speed: 1.22, gravity: 15.7 },
+  { name: "Deep Packet Mine", tint: 0x35bfff, loot: ["packetIngot", "vaultKey", "timeShard"], hazards: 8, speed: 1.28, gravity: 16.0 },
+  { name: "Cloud Server Skybridges", tint: 0x91d7ff, loot: ["dataGem", "jumpBooster", "computeToken"], hazards: 7, speed: 1.34, gravity: 14.2 },
+  { name: "Glitch Market Alley", tint: 0xd65dff, loot: ["glitchRelic", "treasurePouch", "doubleLoot"], hazards: 9, speed: 1.42, gravity: 15.4 },
+  { name: "Blacksite Vault Corridor", tint: 0x58ffaf, loot: ["vaultKey", "packetIngot", "scannerPing"], hazards: 10, speed: 1.5, gravity: 16.2 },
+  { name: "Overclocked Core Chamber", tint: 0x35ffe9, loot: ["computeToken", "doubleLoot", "portalShard"], hazards: 12, speed: 1.62, gravity: 16.5 },
+];
+
+const LOOT = {
+  computeToken: { cell: [0, 0], value: 100, label: "compute token" },
+  dataGem: { cell: [1, 0], value: 160, label: "data gem" },
+  packetIngot: { cell: [2, 0], value: 220, label: "packet ingot" },
+  cacheCrystal: { cell: [3, 0], value: 180, label: "cache crystal" },
+  glitchRelic: { cell: [0, 1], value: 320, label: "glitch relic" },
+  vaultKey: { cell: [1, 1], value: 260, label: "vault key" },
+  treasurePouch: { cell: [2, 1], value: 240, label: "treasure pouch" },
+  magnetAura: { cell: [3, 1], ability: "magnet", label: "magnet aura" },
+  speedBoots: { cell: [0, 2], ability: "speed", label: "speed boots" },
+  bigSatchel: { cell: [1, 2], ability: "satchel", label: "bigger satchel" },
+  scannerPing: { cell: [2, 2], ability: "scanner", label: "scanner ping" },
+  shieldBattery: { cell: [3, 2], ability: "shield", label: "shield battery" },
+  doubleLoot: { cell: [0, 3], ability: "multiplier", label: "double loot" },
+  timeShard: { cell: [1, 3], ability: "time", label: "time shard" },
+  jumpBooster: { cell: [2, 3], ability: "jump", label: "jump booster" },
+  portalShard: { cell: [3, 3], ability: "exit", label: "portal shard" },
 };
-
-for (const [key, file] of Object.entries(spriteFiles)) {
-  const texture = textureLoader.load(`./assets/sprites/${file}`);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.magFilter = THREE.LinearFilter;
-  texture.minFilter = THREE.LinearMipmapLinearFilter;
-  spriteTextures[key] = texture;
-}
-
-scene.add(new THREE.HemisphereLight(0x9aff9b, 0x06110a, 2.8));
-
-const keyLight = new THREE.DirectionalLight(0xb7ff9d, 3.1);
-keyLight.position.set(-5, 12, 8);
-keyLight.castShadow = true;
-keyLight.shadow.mapSize.set(2048, 2048);
-keyLight.shadow.camera.left = -14;
-keyLight.shadow.camera.right = 14;
-keyLight.shadow.camera.top = 10;
-keyLight.shadow.camera.bottom = -10;
-scene.add(keyLight);
-
-const cyanLight = new THREE.PointLight(colors.cyan, 8, 16);
-cyanLight.position.set(-3.5, 4, -3.5);
-scene.add(cyanLight);
-
-const amberLight = new THREE.PointLight(colors.amber, 6, 13);
-amberLight.position.set(7.5, 3.8, 3);
-scene.add(amberLight);
-
-const shared = {
-  floor: new THREE.MeshStandardMaterial({ color: colors.floor, roughness: 0.92, metalness: 0.03 }),
-  moss: new THREE.MeshStandardMaterial({ color: colors.moss, roughness: 0.95 }),
-  stone: new THREE.MeshStandardMaterial({ color: colors.stone, roughness: 0.86 }),
-  darkStone: new THREE.MeshStandardMaterial({ color: colors.darkStone, roughness: 0.9 }),
-  terminal: new THREE.MeshStandardMaterial({ color: 0x111915, roughness: 0.78, metalness: 0.08 }),
-  terminalSide: new THREE.MeshStandardMaterial({ color: 0x29332d, roughness: 0.72, metalness: 0.12 }),
-  green: new THREE.MeshStandardMaterial({ color: colors.green, emissive: 0x1f7a20, emissiveIntensity: 0.3, roughness: 0.7 }),
-  amber: new THREE.MeshStandardMaterial({ color: colors.amber, emissive: colors.amber, emissiveIntensity: 0.75, roughness: 0.45 }),
-  cyan: new THREE.MeshStandardMaterial({ color: colors.cyan, emissive: colors.cyan, emissiveIntensity: 1.5, roughness: 0.28 }),
-  token: new THREE.MeshStandardMaterial({ color: colors.cyan, emissive: colors.cyan, emissiveIntensity: 2.6, roughness: 0.18, metalness: 0.22 }),
-  red: new THREE.MeshStandardMaterial({ color: colors.red, emissive: colors.red, emissiveIntensity: 1.2 }),
-  wood: new THREE.MeshStandardMaterial({ color: colors.wood, roughness: 0.82 }),
-};
-
-function makeSprite(textureKey, height, position, options = {}) {
-  const texture = spriteTextures[textureKey];
-  const material = new THREE.SpriteMaterial({
-    map: texture,
-    transparent: true,
-    depthWrite: false,
-    alphaTest: 0.03,
-    color: options.color ?? 0xffffff,
-  });
-  const sprite = new THREE.Sprite(material);
-  const aspect = options.aspect ?? spriteAspect[textureKey] ?? 1;
-  sprite.scale.set(height * aspect, height, 1);
-  sprite.position.copy(position);
-  sprite.renderOrder = options.renderOrder ?? Math.round(position.z * 10 + position.y * 100);
-  sprite.userData.textureKey = textureKey;
-  return sprite;
-}
-
-function setSpriteTexture(sprite, textureKey) {
-  if (!sprite || sprite.userData.textureKey === textureKey) return;
-  const height = sprite.scale.y;
-  const facing = Math.sign(sprite.scale.x || 1);
-  sprite.material.map = spriteTextures[textureKey];
-  sprite.material.needsUpdate = true;
-  sprite.scale.x = height * (spriteAspect[textureKey] ?? 1) * facing;
-  sprite.userData.textureKey = textureKey;
-}
-
-function addPaintedGroundDecal(textureKey, x, z, width, rotation = 0, opacity = 0.9) {
-  const aspect = spriteAspect[textureKey] ?? 1;
-  const material = new THREE.MeshBasicMaterial({
-    map: spriteTextures[textureKey],
-    transparent: true,
-    alphaTest: 0.03,
-    opacity,
-    depthWrite: false,
-  });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width / aspect), material);
-  mesh.position.set(x, 0.062, z);
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.rotation.z = rotation;
-  mesh.renderOrder = 5;
-  root.add(mesh);
-}
-
-function addWallSprite(textureKey, x, z, height, y = 0.92) {
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.add(makeSprite(textureKey, height, new THREE.Vector3(0, y, 0), { renderOrder: 35 }));
-  root.add(group);
-}
-
-function addSpriteShadow(group, width, depth) {
-  const shadow = new THREE.Mesh(
-    new THREE.CircleGeometry(0.5, 28),
-    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false })
-  );
-  shadow.rotation.x = -Math.PI / 2;
-  shadow.scale.set(width, depth, 1);
-  shadow.position.y = 0.025;
-  group.add(shadow);
-}
 
 const state = {
+  levelIndex: 0,
   score: 0,
   collected: 0,
-  timeLeft: 105,
+  totalLoot: 0,
+  timeLeft: 80,
+  difficulty: 1,
   status: "playing",
   startedAt: performance.now(),
 };
@@ -210,384 +79,385 @@ const state = {
 const player = {
   group: new THREE.Group(),
   sprite: null,
+  velocity: new THREE.Vector2(0, 0),
+  grounded: false,
   facing: 1,
-  dashCooldown: 0,
-  invulnerable: 0,
+  magnet: 1.0,
+  speedBoost: 1.0,
+  jumpBoost: 1.0,
+  multiplier: 1,
+  shield: 0,
+  satchel: 0,
+  scanner: 0,
 };
 
-const tokens = [];
-const beams = [];
-const particles = [];
+const runtime = {
+  levelLength: 72,
+  groundY: -3.65,
+  cameraX: 0,
+  platforms: [],
+  loot: [],
+  hazards: [],
+  props: [],
+};
 
-const COMPUTE_TOKEN_ARTIFACTS = [
-  { name: "cold-wallet-cipher", x: -7.5, z: 3.1 },
-  { name: "moss-cache-thread", x: -5.8, z: -1.6 },
-  { name: "left-terminal-orbit", x: -3.5, z: 1.8 },
-  { name: "north-rune-cache", x: -1.1, z: 4.4 },
-  { name: "center-ring-spark", x: 0.0, z: -3.4 },
-  { name: "audit-gap-shard", x: 2.0, z: 2.6 },
-  { name: "right-ring-spark", x: 3.9, z: -0.6 },
-  { name: "shrine-cache-sigil", x: 5.4, z: 4.0 },
-  { name: "green-crystal-orbit", x: 6.7, z: -3.1 },
-  { name: "danger-post-chip", x: 8.2, z: 1.7 },
-  { name: "depth-sign-spark", x: -8.7, z: -0.5 },
-  { name: "south-ring-chip", x: 1.7, z: -4.2 },
-  { name: "southwest-cache", x: -1.0, z: -4.7 },
-  { name: "right-terminal-orbit", x: 7.9, z: -0.7 },
-  { name: "obelisk-echo", x: -4.2, z: 4.3 },
-];
+scene.add(new THREE.AmbientLight(0xbaffb5, 1.7));
+const glow = new THREE.PointLight(0x35f5ff, 7, 24);
+glow.position.set(0, 1, 7);
+scene.add(glow);
+scene.add(player.group);
 
-const RUIN_ARTIFACTS = [
-  { kind: "terminal", name: "packet-monolith", x: -8.3, z: -1.8, scale: 1.25, rotation: -0.23, lines: ["> SYS.OK", "> GRID.ONLINE", "> NODES: 42", "> PACKETS: 1203", ">_"] },
-  { kind: "terminal", name: "question-cache", x: 8.0, z: -1.7, scale: 1.1, rotation: 0.18, lines: ["", "     ?", "", "----"] },
-  { kind: "obelisk", name: "cyan-memory-obelisk", x: -2.4, z: -3.6, scale: 1.05 },
-  { kind: "shrine", name: "amber-runtime-shrine", x: 4.5, z: -3.2, scale: 1 },
-  { kind: "node", name: "micro-cache-node", x: -0.35, z: -3.35, scale: 0.9 },
-  { kind: "beamMachine", name: "audit-emitter-west", x: 5.8, z: 3.5, scale: 0.9 },
-  { kind: "beamMachine", name: "audit-emitter-east", x: 8.3, z: 0.6, scale: 0.75 },
-  { kind: "crate", name: "golden-packet-crate", x: 2.3, z: 2.2, scale: 0.76 },
-  { kind: "crate", name: "burnt-relay-crate", x: -3.2, z: 0.4, scale: 0.62 },
-  { kind: "sign", name: "depth-marker", x: -8.8, z: 3.6, label: "D3PTH ->", danger: false },
-  { kind: "sign", name: "danger-marker", x: 8.9, z: 3.6, label: "DANGER", danger: true },
-  { kind: "crystal", name: "east-green-crystal", x: 8.5, z: 1.8, scale: 1.1 },
-  { kind: "crystal", name: "south-green-crystal", x: 5.6, z: 5.0, scale: 1.25 },
-  { kind: "plant", name: "left-glow-grass", x: -8.0, z: 5.0, scale: 0.85 },
-  { kind: "plant", name: "right-glow-grass", x: 7.0, z: 5.0, scale: 0.8 },
-  { kind: "mushrooms", name: "left-rust-caps", x: -9.6, z: 2.5, scale: 0.9 },
-];
-
-const AUDIT_BEAM_ARTIFACTS = [
-  { name: "left-sweep", x1: -6.0, z1: -0.6, x2: -2.9, z2: -2.2, phase: 1.7, speed: 1.04 },
-  { name: "right-sweep", x1: 4.3, z1: 4.1, x2: 8.1, z2: 1.1, phase: 0.1, speed: 1.18 },
-  { name: "south-sweep", x1: -0.6, z1: 4.7, x2: 2.2, z2: 1.6, phase: 2.5, speed: 0.95 },
-];
-
-const totalTokens = COMPUTE_TOKEN_ARTIFACTS.length;
-
-function makeBox(width, height, depth, material, position, rotationY = 0) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
-  mesh.position.copy(position);
-  mesh.rotation.y = rotationY;
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return mesh;
-}
-
-function makeCylinder(radiusTop, radiusBottom, height, sides, material, position) {
-  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, height, sides), material);
-  mesh.position.copy(position);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return mesh;
-}
-
-function addTextPanel(textLines, width = 512, height = 384) {
-  const textureCanvas = document.createElement("canvas");
-  textureCanvas.width = width;
-  textureCanvas.height = height;
-  const ctx = textureCanvas.getContext("2d");
-  ctx.fillStyle = "#06120b";
-  ctx.fillRect(0, 0, width, height);
-  ctx.fillStyle = "#75ff66";
-  ctx.shadowColor = "#75ff66";
-  ctx.shadowBlur = 8;
-  ctx.font = "34px Courier New";
-  textLines.forEach((line, index) => ctx.fillText(line, 42, 72 + index * 49));
-  const texture = new THREE.CanvasTexture(textureCanvas);
+function loadTexture(path) {
+  const texture = loader.load(path);
   texture.colorSpace = THREE.SRGBColorSpace;
-  return new THREE.MeshBasicMaterial({ map: texture });
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  return texture;
 }
 
-function setupWorld() {
-  root.clear();
-  tokens.length = 0;
-  beams.length = 0;
-  particles.length = 0;
+function cloneAtlasTexture(source, rect) {
+  const texture = source.clone();
+  texture.needsUpdate = true;
+  texture.offset.set(rect.x, rect.y);
+  texture.repeat.set(rect.w, rect.h);
+  return texture;
+}
 
-  const floor = new THREE.Mesh(new THREE.CylinderGeometry(9.8, 10.6, 0.32, 96), shared.floor);
-  floor.scale.z = 0.56;
-  floor.position.y = -0.18;
-  floor.receiveShadow = true;
-  root.add(floor);
+function worldRect(levelIndex, part) {
+  const rowH = 1 / 10;
+  const y = 1 - (levelIndex + 1) * rowH;
+  if (part === "background") return { x: 0.006, y, w: 0.423, h: rowH * 0.92 };
+  if (part === "propA") return { x: 0.455, y: y + rowH * 0.1, w: 0.07, h: rowH * 0.78 };
+  if (part === "propB") return { x: 0.535, y: y + rowH * 0.1, w: 0.07, h: rowH * 0.78 };
+  if (part === "propC") return { x: 0.615, y: y + rowH * 0.1, w: 0.06, h: rowH * 0.78 };
+  if (part === "tile") return { x: 0.686, y: y + rowH * 0.16, w: 0.132, h: rowH * 0.68 };
+  if (part === "smallTile") return { x: 0.818, y: y + rowH * 0.17, w: 0.071, h: rowH * 0.64 };
+  return { x: 0.91, y: y + rowH * 0.16, w: 0.08, h: rowH * 0.68 };
+}
 
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(5.05, 0.08, 12, 120), shared.stone);
-  rim.position.set(0, 0.02, 0);
-  rim.rotation.x = Math.PI / 2;
-  rim.scale.z = 0.62;
-  root.add(rim);
+function lootRect(key) {
+  const [col, row] = LOOT[key].cell;
+  return { x: col * 0.25 + 0.018, y: 1 - (row + 1) * 0.25 + 0.018, w: 0.214, h: 0.214 };
+}
 
-  for (let i = 0; i < 5; i += 1) {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.85 + i * 0.55, 0.055, 10, 80), i % 2 ? shared.darkStone : shared.stone);
-    ring.position.set(0.45, 0.03 + i * 0.008, -0.25);
-    ring.rotation.x = Math.PI / 2;
-    ring.scale.z = 0.62;
-    ring.receiveShadow = true;
-    root.add(ring);
-  }
+function makeSprite(texture, width, height, x, y, renderOrder = 1) {
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, alphaTest: 0.02, depthWrite: false });
+  const sprite = new THREE.Sprite(material);
+  sprite.position.set(x, y, 0);
+  sprite.scale.set(width, height, 1);
+  sprite.renderOrder = renderOrder;
+  return sprite;
+}
 
-  for (let i = 0; i < 170; i += 1) addSlab(i);
-  for (let i = 0; i < 95; i += 1) addMoss(i);
-  for (let i = 0; i < 42; i += 1) addPaintedFloorPatch(i);
-  for (let i = 0; i < 38; i += 1) addBackWallShard(i);
-  for (let i = 0; i < 18; i += 1) addPaintedWallPatch(i);
+function makePlane(texture, width, height, x, y, renderOrder = 0, opacity = 1) {
+  const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, alphaTest: 0.02, opacity, depthWrite: false });
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
+  plane.position.set(x, y, -renderOrder * 0.01);
+  plane.renderOrder = renderOrder;
+  return plane;
+}
 
-  RUIN_ARTIFACTS.forEach(spawnRuinArtifact);
-  COMPUTE_TOKEN_ARTIFACTS.forEach((artifact, index) => addToken(artifact, index));
-  AUDIT_BEAM_ARTIFACTS.forEach(addAuditBeam);
+function clearWorld() {
+  while (worldRoot.children.length) worldRoot.remove(worldRoot.children[0]);
+  runtime.platforms.length = 0;
+  runtime.loot.length = 0;
+  runtime.hazards.length = 0;
+  runtime.props.length = 0;
+}
 
+function setupLevel(index) {
+  clearWorld();
+  const level = LEVELS[index];
+  state.levelIndex = index;
+  state.timeLeft = Math.max(55, 82 - index * 3);
+  state.collected = 0;
+  state.totalLoot = 0;
+  state.status = "playing";
+  state.startedAt = performance.now();
+  state.difficulty = 1 + index * 0.18;
+  runtime.levelLength = 68 + index * 5;
+  runtime.cameraX = 0;
+  glow.color.setHex(level.tint);
+
+  addBackground(index);
+  buildGround(index);
+  buildPlatforms(index);
+  buildProps(index);
+  spawnLoot(index);
+  spawnHazards(index);
   buildPlayer();
-  root.add(player.group);
+  setToast(level.name, "Collect loot, grab upgrades, and reach the portal shard.", false);
+  updateHud();
 }
 
-function spawnRuinArtifact(artifact) {
-  switch (artifact.kind) {
-    case "terminal":
-      addTerminal(artifact);
-      break;
-    case "obelisk":
-      addObelisk(artifact);
-      break;
-    case "shrine":
-      addShrine(artifact);
-      break;
-    case "node":
-      addDataNode(artifact);
-      break;
-    case "beamMachine":
-      addBeamMachine(artifact);
-      break;
-    case "crate":
-      addCrate(artifact);
-      break;
-    case "sign":
-      addSign(artifact);
-      break;
-    case "crystal":
-      addCrystal(artifact);
-      break;
-    case "plant":
-      addPlant(artifact);
-      break;
-    case "mushrooms":
-      addMushrooms(artifact);
-      break;
-    default:
-      throw new Error(`Unknown ruin artifact: ${artifact.kind}`);
+function addBackground(index) {
+  const bgTexture = cloneAtlasTexture(textures.worlds, worldRect(index, "background"));
+  for (let i = 0; i < 8; i += 1) {
+    worldRoot.add(makePlane(bgTexture, 17.5, 5.3, i * 15.8 + 1.2, 0.75, -1, 1));
+  }
+  const veil = new THREE.Mesh(
+    new THREE.PlaneGeometry(runtime.levelLength + 32, 13.5),
+    new THREE.MeshBasicMaterial({ color: LEVELS[index].tint, transparent: true, opacity: 0.08, depthWrite: false })
+  );
+  veil.position.set(runtime.levelLength / 2, 0, 0.08);
+  worldRoot.add(veil);
+}
+
+function buildGround(index) {
+  for (let x = -2; x < runtime.levelLength + 8; x += 2.8) {
+    addPlatform(x, runtime.groundY, 3.05, 0.78, index, x % 5 < 2 ? "tile" : "smallTile");
   }
 }
 
-function addSlab(i) {
-  const angle = (i * 137.5 * Math.PI) / 180;
-  const radius = 0.55 + (i % 17) * 0.51;
-  const x = Math.cos(angle) * radius * 1.15;
-  const z = Math.sin(angle) * radius * 0.82;
-  if ((x / 10.1) ** 2 + (z / 5.7) ** 2 > 1) return;
-  const slab = makeBox(
-    0.42 + (i % 5) * 0.1,
-    0.08,
-    0.22 + (i % 4) * 0.06,
-    i % 6 === 0 ? shared.darkStone : shared.stone,
-    new THREE.Vector3(x, 0.04, z),
-    (i % 8) * 0.34
-  );
-  root.add(slab);
+function buildPlatforms(index) {
+  const count = 6 + index;
+  for (let i = 0; i < count; i += 1) {
+    const x = 7 + i * (7.2 - Math.min(index, 5) * 0.25);
+    const y = -2.1 + ((i * 37 + index * 11) % 34) / 10;
+    const width = 2.4 + ((i + index) % 3) * 0.75;
+    addPlatform(x, y, width, 0.55, index, i % 2 ? "smallTile" : "tile");
+  }
 }
 
-function addMoss(i) {
-  const angle = (i * 2.399963) % (Math.PI * 2);
-  const radius = Math.sqrt((i * 37) % 1000) / Math.sqrt(1000);
-  const x = Math.cos(angle) * 9.2 * radius;
-  const z = Math.sin(angle) * 5.2 * radius;
-  const moss = new THREE.Mesh(new THREE.CircleGeometry(0.22 + (i % 5) * 0.07, 12), shared.moss);
-  moss.position.set(x, 0.055, z);
-  moss.rotation.x = -Math.PI / 2;
-  moss.rotation.z = i * 0.31;
-  moss.scale.z = 0.44 + (i % 4) * 0.08;
-  root.add(moss);
+function addPlatform(x, y, width, height, index, part) {
+  const texture = cloneAtlasTexture(textures.worlds, worldRect(index, part));
+  const sprite = makePlane(texture, width, height, x, y, 2);
+  worldRoot.add(sprite);
+  runtime.platforms.push({ x, y, width, height });
 }
 
-function addPaintedFloorPatch(i) {
-  const textureKey = i % 11 === 0 ? "runePlatform" : i % 3 === 0 ? "mossTile" : "stoneTile";
-  const angle = (i * 2.147) % (Math.PI * 2);
-  const radius = 1.4 + ((i * 43) % 100) / 100 * 8.2;
-  const x = Math.cos(angle) * radius * 1.08;
-  const z = Math.sin(angle) * radius * 0.58;
-  if ((x / 10.2) ** 2 + (z / 5.4) ** 2 > 1) return;
-  const width = textureKey === "runePlatform" ? 1.9 : 0.9 + (i % 5) * 0.18;
-  addPaintedGroundDecal(textureKey, x, z, width, angle + i * 0.19, textureKey === "mossTile" ? 0.72 : 0.9);
+function buildProps(index) {
+  for (let i = 0; i < 20; i += 1) {
+    const part = ["propA", "propB", "propC"][i % 3];
+    const texture = cloneAtlasTexture(textures.worlds, worldRect(index, part));
+    const x = 3 + i * (runtime.levelLength / 20) + ((i * 19) % 7) * 0.17;
+    const y = runtime.groundY + 1.05 + (i % 2) * 0.18;
+    const sprite = makeSprite(texture, 1.15 + (i % 3) * 0.3, 1.45 + (i % 4) * 0.25, x, y, 8);
+    worldRoot.add(sprite);
+    runtime.props.push(sprite);
+  }
 }
 
-function addBackWallShard(i) {
-  const x = -11.2 + i * 0.62;
-  const z = -5.65 + ((i * 19) % 20) * 0.055;
-  const shard = makeBox(0.22 + (i % 3) * 0.08, 1.2 + (i % 5) * 0.34, 0.18, shared.darkStone, new THREE.Vector3(x, 0.45, z), (i % 7) * 0.11);
-  shard.rotation.z = -0.2 + (i % 4) * 0.14;
-  root.add(shard);
+function spawnLoot(index) {
+  const level = LEVELS[index];
+  const baseLoot = 22 + index * 4;
+  const abilityPool = ["magnetAura", "speedBoots", "bigSatchel", "scannerPing", "shieldBattery", "doubleLoot", "timeShard", "jumpBooster"];
+  for (let i = 0; i < baseLoot; i += 1) {
+    const key = i % 9 === 0 ? abilityPool[(i + index) % abilityPool.length] : level.loot[(i + index) % level.loot.length];
+    const x = 4 + i * (runtime.levelLength - 10) / baseLoot;
+    const y = i % 4 === 0 ? -1.2 : i % 5 === 0 ? 1.0 : -2.65 + (i % 3) * 0.72;
+    addLoot(key, x, y);
+  }
+  addLoot("portalShard", runtime.levelLength - 3.5, -1.35);
 }
 
-function addPaintedWallPatch(i) {
-  const textureKey = i % 4 === 0 ? "caveWallStrip" : "wallShards";
-  const side = i % 3;
-  const x = side === 0 ? -10.4 + i * 1.1 : side === 1 ? 10.1 - i * 0.72 : -9.4 + i * 1.05;
-  const z = side === 2 ? -5.45 : -5.1 + (i % 6) * 0.38;
-  const height = textureKey === "caveWallStrip" ? 2.15 + (i % 4) * 0.22 : 1.38 + (i % 3) * 0.25;
-  addWallSprite(textureKey, x, z, height, height * 0.48);
+function addLoot(key, x, y) {
+  const texture = cloneAtlasTexture(textures.loot, lootRect(key));
+  const sprite = makeSprite(texture, key === "portalShard" ? 1.4 : 0.75, key === "portalShard" ? 1.4 : 0.75, x, y, 30);
+  sprite.userData = { key, taken: false, baseY: y, pulse: Math.random() * Math.PI * 2 };
+  worldRoot.add(sprite);
+  runtime.loot.push(sprite);
+  if (key !== "portalShard") state.totalLoot += 1;
 }
 
-function addTerminal({ x, z, scale, rotation, lines }) {
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.scale.setScalar(scale);
-  addSpriteShadow(group, 1.25, 0.62);
-  const key = lines.some((line) => line.includes("?")) ? "terminalQuestion" : "terminalMain";
-  group.add(makeSprite(key, key === "terminalMain" ? 2.9 : 2.65, new THREE.Vector3(0, 1.42, 0), { renderOrder: 50 }));
-  root.add(group);
-}
-
-function addObelisk({ x, z, scale }) {
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.scale.setScalar(scale);
-  addSpriteShadow(group, 1.15, 0.62);
-  group.add(makeSprite("crystalObelisk", 3.1, new THREE.Vector3(0, 1.55, 0), { renderOrder: 65 }));
-  group.add(new THREE.PointLight(colors.cyan, 8, 7));
-  root.add(group);
-}
-
-function addShrine({ x, z, scale }) {
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.scale.setScalar(scale);
-  addSpriteShadow(group, 1.0, 0.58);
-  group.add(makeSprite("amberShrine", 2.35, new THREE.Vector3(0, 1.12, 0), { renderOrder: 62 }));
-  const light = new THREE.PointLight(colors.amber, 5, 5);
-  light.position.set(0, 1.0, 0.6);
-  group.add(light);
-  root.add(group);
-}
-
-function addDataNode({ x, z, scale }) {
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.scale.setScalar(scale);
-  addSpriteShadow(group, 0.44, 0.22);
-  group.add(makeSprite("stoneTile", 0.65, new THREE.Vector3(0, 0.36, 0), { renderOrder: 46 }));
-  group.add(new THREE.PointLight(colors.cyan, 3.5, 4));
-  root.add(group);
-}
-
-function addBeamMachine({ x, z, scale }) {
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.scale.setScalar(scale);
-  addSpriteShadow(group, 0.74, 0.42);
-  group.add(makeSprite("auditEmitter", 1.65, new THREE.Vector3(0, 0.82, 0), { renderOrder: 58 }));
-  root.add(group);
-}
-
-function addCrate({ x, z, scale }) {
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.scale.setScalar(scale);
-  addSpriteShadow(group, 0.42, 0.28);
-  group.add(makeSprite("stoneTile", 0.72, new THREE.Vector3(0, 0.38, 0), { renderOrder: 47 }));
-  root.add(group);
-}
-
-function addSign({ x, z, label, danger }) {
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  addSpriteShadow(group, 0.62, 0.25);
-  group.add(makeSprite(danger ? "signDanger" : "signDepth", 1.28, new THREE.Vector3(0, 0.7, 0), { renderOrder: 57 }));
-  root.add(group);
-}
-
-function addCrystal({ x, z, scale }) {
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.scale.setScalar(scale);
-  addSpriteShadow(group, 0.6, 0.34);
-  group.add(makeSprite("greenCrystal", 1.55, new THREE.Vector3(0, 0.78, 0), { renderOrder: 56 }));
-  const light = new THREE.PointLight(colors.green, 4.5, 4.5);
-  light.position.y = 0.9;
-  group.add(light);
-  root.add(group);
-}
-
-function addPlant({ x, z, scale }) {
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.scale.setScalar(scale);
-  group.add(makeSprite("grassTuft", 0.95, new THREE.Vector3(0, 0.48, 0), { renderOrder: 52 }));
-  root.add(group);
-}
-
-function addMushrooms({ x, z, scale }) {
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.scale.setScalar(scale);
-  group.add(makeSprite("mushrooms", 1.1, new THREE.Vector3(0, 0.54, 0), { renderOrder: 52 }));
-  root.add(group);
-}
-
-function addToken({ name, x, z }, index) {
-  const group = new THREE.Group();
-  group.position.set(x, 0.78, z);
-  const token = makeSprite("computeToken", 0.92, new THREE.Vector3(0, 0, 0), { renderOrder: 80 });
-  const light = new THREE.PointLight(colors.cyan, 5.6, 4);
-  group.add(token, light);
-  group.userData = { name, index, taken: false, baseY: 0.78, pulse: Math.random() * Math.PI * 2 };
-  tokens.push(group);
-  root.add(group);
-}
-
-function addAuditBeam({ name, x1, z1, x2, z2, phase, speed }) {
-  const group = new THREE.Group();
-  const a = new THREE.Vector3(x1, 0.58, z1);
-  const b = new THREE.Vector3(x2, 0.58, z2);
-  const mid = a.clone().add(b).multiplyScalar(0.5);
-  const length = a.distanceTo(b);
-  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, length, 10), new THREE.MeshBasicMaterial({ color: colors.amber }));
-  beam.position.copy(mid);
-  beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
-  const beamArt = makeSprite("auditBeam", 1.25, mid.clone().add(new THREE.Vector3(0, 0.1, 0)), { renderOrder: 76 });
-  beamArt.scale.x = length * 0.62;
-  beamArt.scale.y = 1.2;
-  const light = new THREE.PointLight(colors.amber, 3.8, 6);
-  light.position.copy(mid);
-  group.add(beam, beamArt, light);
-  group.userData = { name, a, b, phase, speed, beam, beamArt, light };
-  beams.push(group);
-  root.add(group);
+function spawnHazards(index) {
+  const level = LEVELS[index];
+  for (let i = 0; i < level.hazards; i += 1) {
+    const x = 8 + i * (runtime.levelLength - 16) / Math.max(1, level.hazards - 1);
+    const y = i % 2 ? runtime.groundY + 0.72 : -1.1;
+    const hazard = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.32, i % 2 ? 1.35 : 0.32),
+      new THREE.MeshBasicMaterial({ color: 0xff7b29, transparent: true, opacity: 0.85, depthWrite: false })
+    );
+    hazard.position.set(x, y, -0.4);
+    hazard.userData = { x, y, phase: i * 1.7, radius: i % 2 ? 0.65 : 0.52 };
+    worldRoot.add(hazard);
+    runtime.hazards.push(hazard);
+  }
 }
 
 function buildPlayer() {
   player.group.clear();
-  player.group.position.set(0, 0, 1.1);
+  player.velocity.set(0, 0);
+  player.group.position.set(0, runtime.groundY + 1.05, 1);
   player.facing = 1;
-  addSpriteShadow(player.group, 0.5, 0.26);
-  const sprite = makeSprite("goblinIdle", 1.75, new THREE.Vector3(0, 0.92, 0), { renderOrder: 90 });
-  sprite.name = "goblinSprite";
-  player.sprite = sprite;
-  player.group.add(sprite);
+  player.sprite = makeSprite(textures.goblinIdle, 1.15, 1.55, 0, 0, 50);
+  player.group.add(player.sprite);
 }
 
-function resetGame() {
+function resetRun() {
+  player.magnet = 1;
+  player.speedBoost = 1;
+  player.jumpBoost = 1;
+  player.multiplier = 1;
+  player.shield = 0;
+  player.satchel = 0;
+  player.scanner = 0;
   state.score = 0;
-  state.collected = 0;
-  state.timeLeft = 105;
-  state.status = "playing";
-  state.startedAt = performance.now();
-  player.group.position.set(0, 0, 1.1);
-  player.group.scale.set(1, 1, 1);
-  player.dashCooldown = 0;
-  player.invulnerable = 0;
-  tokens.forEach((token) => {
-    token.visible = true;
-    token.userData.taken = false;
-  });
-  setToast("Sniff out the compute", "Move with WASD or arrows. Dash with Shift. Avoid the audit beams.", false);
+  setupLevel(0);
+}
+
+function update(delta) {
+  if (state.status !== "playing") return;
+  const level = LEVELS[state.levelIndex];
+  const fatigue = Math.max(0, 1 - state.timeLeft / Math.max(1, 82 - state.levelIndex * 3));
+  state.difficulty = 1 + state.levelIndex * 0.18 + fatigue * 0.55 + (state.collected / Math.max(1, state.totalLoot)) * 0.25;
+  state.timeLeft = Math.max(0, state.timeLeft - delta);
+  if (state.timeLeft <= 0) {
+    state.status = "lost";
+    setToast("Run expired", "Press R to restart the loot route.", true);
+  }
+
+  const left = keys.has("arrowleft") || keys.has("a");
+  const right = keys.has("arrowright") || keys.has("d");
+  const jump = keys.has("arrowup") || keys.has("w") || keys.has(" ");
+  const dash = keys.has("shift") || keys.has("shiftleft") || keys.has("shiftright");
+  const move = (right ? 1 : 0) - (left ? 1 : 0);
+  const maxSpeed = (5.2 + player.speedBoost * 0.55) * level.speed;
+  player.velocity.x += move * 18 * delta;
+  player.velocity.x *= Math.pow(0.001, delta);
+  player.velocity.x = clamp(player.velocity.x, -maxSpeed, maxSpeed + (dash ? 1.8 : 0));
+  if (jump && player.grounded) {
+    player.velocity.y = 6.4 + player.jumpBoost * 0.55;
+    player.grounded = false;
+  }
+  player.velocity.y -= level.gravity * state.difficulty * delta;
+  player.group.position.x = clamp(player.group.position.x + player.velocity.x * delta, 0, runtime.levelLength);
+  player.group.position.y += player.velocity.y * delta;
+  collidePlatforms();
+  if (move !== 0) {
+    player.facing = Math.sign(move);
+    player.group.scale.x = player.facing;
+  }
+
+  updatePlayerSprite(Boolean(move), dash);
+  updateLoot(delta);
+  updateHazards(delta);
+  updateCamera(delta);
+  if (performance.now() - state.startedAt > 5200) toast.classList.add("is-quiet");
   updateHud();
+}
+
+function collidePlatforms() {
+  player.grounded = false;
+  const px = player.group.position.x;
+  const py = player.group.position.y;
+  for (const platform of runtime.platforms) {
+    const top = platform.y + platform.height * 0.5 + 0.65;
+    const withinX = px > platform.x - platform.width * 0.55 && px < platform.x + platform.width * 0.55;
+    if (withinX && player.velocity.y <= 0 && py >= top - 0.45 && py <= top + 0.55) {
+      player.group.position.y = top;
+      player.velocity.y = 0;
+      player.grounded = true;
+    }
+  }
+  if (player.group.position.y < runtime.groundY - 3) {
+    damagePlayer("Fell off route", 5);
+    player.group.position.set(Math.max(0, player.group.position.x - 2), runtime.groundY + 1.05, 1);
+    player.velocity.set(0, 0);
+  }
+}
+
+function updatePlayerSprite(moving, dash) {
+  const key = dash && moving ? "goblinDash" : moving ? (Math.floor(performance.now() / 150) % 2 ? "goblinWalkA" : "goblinWalkB") : "goblinIdle";
+  if (player.sprite.material.map !== textures[key]) {
+    player.sprite.material.map = textures[key];
+    player.sprite.material.needsUpdate = true;
+  }
+  player.sprite.position.y = Math.sin(performance.now() / (moving ? 95 : 340)) * (moving ? 0.045 : 0.018);
+}
+
+function updateLoot(delta) {
+  const px = player.group.position.x;
+  const py = player.group.position.y;
+  runtime.loot.forEach((sprite) => {
+    if (sprite.userData.taken) return;
+    sprite.userData.pulse += delta * 4.2;
+    sprite.position.y = sprite.userData.baseY + Math.sin(sprite.userData.pulse) * 0.12;
+    const loot = LOOT[sprite.userData.key];
+    const dx = px - sprite.position.x;
+    const dy = py - sprite.position.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 2.15 * player.magnet && loot.value && sprite.position.x > px) {
+      sprite.position.x += dx * delta * 2.3;
+      sprite.position.y += dy * delta * 2.3;
+    }
+    if (dist < 0.9) collectLoot(sprite);
+  });
+}
+
+function collectLoot(sprite) {
+  sprite.userData.taken = true;
+  sprite.visible = false;
+  const loot = LOOT[sprite.userData.key];
+  if (loot.ability) applyAbility(loot.ability, loot.label);
+  if (loot.value) {
+    state.collected += 1;
+    state.score += loot.value * player.multiplier + player.satchel * 25;
+    setToast("Loot pocketed", `${loot.label} secured.`, false);
+  }
+  if (loot.ability === "exit") advanceLevel();
+}
+
+function applyAbility(ability, label) {
+  if (ability === "magnet") player.magnet = Math.min(2.4, player.magnet + 0.35);
+  if (ability === "speed") player.speedBoost = Math.min(4, player.speedBoost + 1);
+  if (ability === "satchel") player.satchel = Math.min(6, player.satchel + 1);
+  if (ability === "scanner") player.scanner = Math.min(4, player.scanner + 1);
+  if (ability === "shield") player.shield = Math.min(3, player.shield + 1);
+  if (ability === "multiplier") player.multiplier = Math.min(4, player.multiplier + 1);
+  if (ability === "time") state.timeLeft += 12;
+  if (ability === "jump") player.jumpBoost = Math.min(4, player.jumpBoost + 1);
+  if (ability !== "exit") setToast("Upgrade found", `${label} improved collection.`, false);
+}
+
+function advanceLevel() {
+  state.score += Math.ceil(state.timeLeft * 30) + state.collected * 80;
+  if (state.levelIndex >= LEVELS.length - 1) {
+    state.status = "won";
+    setToast("All worlds looted", "The route is clean. Press R to run it again.", true);
+    return;
+  }
+  setupLevel(state.levelIndex + 1);
+}
+
+function updateHazards(delta) {
+  runtime.hazards.forEach((hazard) => {
+    const active = Math.sin(performance.now() / 620 * state.difficulty + hazard.userData.phase) > -0.35;
+    hazard.visible = active;
+    hazard.material.opacity = active ? 0.65 + Math.sin(performance.now() / 95) * 0.18 : 0.1;
+    if (!active) return;
+    const dx = player.group.position.x - hazard.position.x;
+    const dy = player.group.position.y - hazard.position.y;
+    if (Math.hypot(dx, dy) < hazard.userData.radius + 0.35) damagePlayer("Audited", 4 + state.levelIndex);
+  });
+}
+
+function damagePlayer(title, penalty) {
+  if (player.shield > 0) {
+    player.shield -= 1;
+    setToast("Shield cracked", "Battery absorbed the zap.", true);
+    return;
+  }
+  state.score = Math.max(0, state.score - 260);
+  state.timeLeft = Math.max(0, state.timeLeft - penalty);
+  player.velocity.x *= -0.35;
+  player.velocity.y = 2.2;
+  setToast(title, `${penalty} seconds burned.`, true);
+}
+
+function updateCamera(delta) {
+  const target = clamp(player.group.position.x + 4, 0, runtime.levelLength - 8);
+  runtime.cameraX += (target - runtime.cameraX) * Math.min(1, delta * 4.5);
+  camera.position.x = runtime.cameraX;
+  glow.position.x = runtime.cameraX + 2;
+}
+
+function updateHud() {
+  tokenCount.textContent = `${state.levelIndex + 1}.${state.collected}`;
+  scoreReadout.textContent = String(state.score).padStart(4, "0");
+  const seconds = Math.max(0, Math.ceil(state.timeLeft));
+  timerReadout.textContent = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
 function setToast(title, body, loud) {
@@ -595,150 +465,6 @@ function setToast(title, body, loud) {
   toast.querySelector("span").textContent = body;
   toast.classList.toggle("is-loud", Boolean(loud));
   toast.classList.remove("is-quiet");
-}
-
-function updateHud() {
-  tokenCount.textContent = state.collected;
-  scoreReadout.textContent = String(state.score).padStart(4, "0");
-  const seconds = Math.max(0, Math.ceil(state.timeLeft));
-  timerReadout.textContent = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-}
-
-function update(delta) {
-  if (state.status !== "playing") {
-    updateParticles(delta);
-    return;
-  }
-
-  state.timeLeft = Math.max(0, state.timeLeft - delta);
-  if (state.timeLeft <= 0) {
-    state.status = "lost";
-    setToast("The clock ate the hoard", "Press R to restart the run.", true);
-  }
-
-  let mx = 0;
-  let mz = 0;
-  if (keys.has("arrowleft") || keys.has("a")) mx -= 1;
-  if (keys.has("arrowright") || keys.has("d")) mx += 1;
-  if (keys.has("arrowup") || keys.has("w")) mz -= 1;
-  if (keys.has("arrowdown") || keys.has("s")) mz += 1;
-
-  const length = Math.hypot(mx, mz) || 1;
-  const dashing = (keys.has("shift") || keys.has("shiftleft") || keys.has("shiftright")) && player.dashCooldown <= 0 && (mx || mz);
-  const speed = dashing ? 7.8 : 3.7;
-  if (dashing) {
-    player.dashCooldown = 0.48;
-    spawnBurst(player.group.position, colors.green, 12);
-  }
-  player.dashCooldown = Math.max(0, player.dashCooldown - delta);
-  player.invulnerable = Math.max(0, player.invulnerable - delta);
-
-  player.group.position.x = clamp(player.group.position.x + (mx / length) * speed * delta, worldBounds.minX, worldBounds.maxX);
-  player.group.position.z = clamp(player.group.position.z + (mz / length) * speed * delta, worldBounds.minZ, worldBounds.maxZ);
-  if (mx !== 0) {
-    player.facing = Math.sign(mx);
-    player.group.scale.x = player.facing;
-  }
-  updatePlayerSprite(Boolean(mx || mz), dashing);
-
-  updateTokens(delta);
-  updateBeams();
-  updateParticles(delta);
-
-  if (performance.now() - state.startedAt > 5600) toast.classList.add("is-quiet");
-  updateHud();
-}
-
-function updatePlayerSprite(moving, dashing) {
-  if (!player.sprite) return;
-  const key = dashing
-    ? "goblinDash"
-    : moving
-      ? Math.floor(performance.now() / 170) % 2
-        ? "goblinWalkA"
-        : "goblinWalkB"
-      : "goblinIdle";
-  setSpriteTexture(player.sprite, key);
-  player.sprite.position.y = 0.92 + (moving ? Math.sin(performance.now() / 95) * 0.035 : Math.sin(performance.now() / 340) * 0.018);
-}
-
-function updateTokens(delta) {
-  tokens.forEach((token) => {
-    token.userData.pulse += delta * 4.5;
-    token.rotation.y += delta * 1.8;
-    token.position.y = token.userData.baseY + Math.sin(token.userData.pulse) * 0.16;
-    if (!token.userData.taken && token.position.distanceTo(player.group.position) < 1.1) {
-      token.userData.taken = true;
-      token.visible = false;
-      state.collected += 1;
-      state.score += 900 + Math.ceil(state.timeLeft * 6);
-      spawnBurst(token.position, colors.cyan, 24);
-      setToast("Compute token pocketed", `${totalTokens - state.collected} tokens remain.`, false);
-      if (state.collected === totalTokens) {
-        state.status = "won";
-        state.score += Math.ceil(state.timeLeft * 55);
-        setToast("Hoard secured", "Every compute token is yours. Press R to run again.", true);
-      }
-    }
-  });
-}
-
-function updateBeams() {
-  const now = performance.now() / 1000;
-  beams.forEach((group) => {
-    const { a, b, phase, speed, beam, beamArt, light } = group.userData;
-    const active = Math.sin(now * speed + phase) > -0.18;
-    beam.visible = active;
-    beamArt.visible = active;
-    beamArt.material.opacity = active ? 0.82 + Math.sin(now * 12 + phase) * 0.14 : 0;
-    light.visible = active;
-    if (!active || player.invulnerable > 0) return;
-    if (distanceToSegment(player.group.position, a, b) < 0.52) {
-      state.score = Math.max(0, state.score - 400);
-      state.timeLeft = Math.max(0, state.timeLeft - 5);
-      player.invulnerable = 1.15;
-      spawnBurst(player.group.position, colors.red, 22);
-      setToast("Audited", "Five seconds burned. Watch the beam rhythm.", true);
-    }
-  });
-}
-
-function spawnBurst(position, color, count) {
-  for (let i = 0; i < count; i += 1) {
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.045 + Math.random() * 0.045, 8, 6), new THREE.MeshBasicMaterial({ color }));
-    mesh.position.copy(position);
-    mesh.position.y += 0.55;
-    const angle = Math.random() * Math.PI * 2;
-    mesh.userData = {
-      age: 0,
-      life: 0.55 + Math.random() * 0.45,
-      velocity: new THREE.Vector3(Math.cos(angle) * (1.2 + Math.random() * 2.2), 1.0 + Math.random() * 1.5, Math.sin(angle) * (1.2 + Math.random() * 2.2)),
-    };
-    particles.push(mesh);
-    scene.add(mesh);
-  }
-}
-
-function updateParticles(delta) {
-  for (let i = particles.length - 1; i >= 0; i -= 1) {
-    const particle = particles[i];
-    particle.userData.age += delta;
-    particle.userData.velocity.y -= 3.4 * delta;
-    particle.position.addScaledVector(particle.userData.velocity, delta);
-    particle.material.opacity = 1 - particle.userData.age / particle.userData.life;
-    particle.material.transparent = true;
-    if (particle.userData.age >= particle.userData.life) {
-      scene.remove(particle);
-      particles.splice(i, 1);
-    }
-  }
-}
-
-function distanceToSegment(point, a, b) {
-  const ab = b.clone().sub(a);
-  const ap = point.clone().sub(a);
-  const t = clamp(ap.dot(ab) / ab.lengthSq(), 0, 1);
-  return point.distanceTo(a.clone().addScaledVector(ab, t));
 }
 
 function clamp(value, min, max) {
@@ -750,7 +476,7 @@ function resize() {
   const height = canvas.clientHeight;
   if (canvas.width !== width || canvas.height !== height) renderer.setSize(width, height, false);
   const aspect = width / Math.max(height, 1);
-  const frustum = 5.45;
+  const frustum = 6.2;
   camera.left = -frustum * aspect;
   camera.right = frustum * aspect;
   camera.top = frustum;
@@ -769,13 +495,12 @@ function loop() {
 window.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
   if (["arrowleft", "arrowright", "arrowup", "arrowdown", " ", "shift"].includes(key)) event.preventDefault();
-  if (key === "r") resetGame();
+  if (key === "r") resetRun();
   keys.add(key);
 });
 
 window.addEventListener("keyup", (event) => keys.delete(event.key.toLowerCase()));
-restart.addEventListener("click", resetGame);
+restart.addEventListener("click", resetRun);
 
-setupWorld();
-resetGame();
+resetRun();
 requestAnimationFrame(loop);
