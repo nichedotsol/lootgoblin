@@ -1,6 +1,6 @@
 # Loot Goblin
 
-A tiny Three.js browser minigame about hunting compute tokens through side-scroller loot worlds.
+A tiny Three.js browser minigame about hunting compute tokens through 3D side-scroller loot worlds.
 
 ## Play
 
@@ -40,8 +40,8 @@ Loot includes score items and collection upgrades: magnet aura, speed boots, big
 This version is intentionally static and build-free:
 
 - HTML/CSS app shell
-- Three.js-rendered side-scroller world, camera, physics, platforms, hazards, and pickups
-- Generated sprite atlas for 10 worlds with backgrounds, props, and modular platform tiles
+- Three.js-rendered 3D side-scroller world, camera, physics, lit platforms, hazards, and pickups
+- Generated sprite atlas for 10 worlds used as background, prop, and surface-detail art over 3D geometry
 - Generated transparent loot/power-up and HUD sprite sheets
 - Three.js loaded as an ES module from jsDelivr
 - Authored level data, loot tables, ability upgrades, and adaptive difficulty rules

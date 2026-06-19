@@ -12,17 +12,26 @@ const clock = new THREE.Clock();
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance", alpha: false });
 renderer.setClearColor(0x020604);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x020604);
 
 const camera = new THREE.OrthographicCamera(-12, 12, 6.75, -6.75, 0.1, 100);
-camera.position.set(0, 0, 10);
+camera.position.set(0, 1.45, 13);
+camera.lookAt(0, -0.85, 0);
 
 const worldRoot = new THREE.Group();
 scene.add(worldRoot);
 
-const loader = new THREE.TextureLoader();
+let assetsReady = false;
+const loadingManager = new THREE.LoadingManager(() => {
+  assetsReady = true;
+  resetRun();
+  requestAnimationFrame(loop);
+});
+const loader = new THREE.TextureLoader(loadingManager);
 const textures = {
   goblinIdle: loadTexture("./assets/sprites/goblin_idle.png"),
   goblinWalkA: loadTexture("./assets/sprites/goblin_walk_a.png"),
@@ -91,6 +100,15 @@ const player = {
   scanner: 0,
 };
 
+const materialBank = {
+  dark: new THREE.MeshStandardMaterial({ color: 0x111a17, roughness: 0.9, metalness: 0.08 }),
+  side: new THREE.MeshStandardMaterial({ color: 0x26342e, roughness: 0.85, metalness: 0.1 }),
+  cyan: new THREE.MeshStandardMaterial({ color: 0x35f5ff, emissive: 0x0d8f94, emissiveIntensity: 1.35, roughness: 0.34 }),
+  amber: new THREE.MeshStandardMaterial({ color: 0xff9c2e, emissive: 0xff6a00, emissiveIntensity: 1.4, roughness: 0.36 }),
+  green: new THREE.MeshStandardMaterial({ color: 0x75ff66, emissive: 0x1f7a20, emissiveIntensity: 0.65, roughness: 0.6 }),
+  blackGlass: new THREE.MeshStandardMaterial({ color: 0x06100c, emissive: 0x0b2f19, emissiveIntensity: 0.5, roughness: 0.55, metalness: 0.2 }),
+};
+
 const runtime = {
   levelLength: 72,
   groundY: -3.65,
@@ -102,6 +120,16 @@ const runtime = {
 };
 
 scene.add(new THREE.AmbientLight(0xbaffb5, 1.7));
+const keyLight = new THREE.DirectionalLight(0xbfffb3, 3.5);
+keyLight.position.set(-3, 7, 8);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.left = -18;
+keyLight.shadow.camera.right = 18;
+keyLight.shadow.camera.top = 10;
+keyLight.shadow.camera.bottom = -10;
+scene.add(keyLight);
+
 const glow = new THREE.PointLight(0x35f5ff, 7, 24);
 glow.position.set(0, 1, 7);
 scene.add(glow);
@@ -140,21 +168,29 @@ function lootRect(key) {
   return { x: col * 0.25 + 0.018, y: 1 - (row + 1) * 0.25 + 0.018, w: 0.214, h: 0.214 };
 }
 
-function makeSprite(texture, width, height, x, y, renderOrder = 1) {
+function makeSprite(texture, width, height, x, y, renderOrder = 1, z = 0) {
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true, alphaTest: 0.02, depthWrite: false });
   const sprite = new THREE.Sprite(material);
-  sprite.position.set(x, y, 0);
+  sprite.position.set(x, y, z);
   sprite.scale.set(width, height, 1);
   sprite.renderOrder = renderOrder;
   return sprite;
 }
 
-function makePlane(texture, width, height, x, y, renderOrder = 0, opacity = 1) {
+function makePlane(texture, width, height, x, y, renderOrder = 0, opacity = 1, z = 0) {
   const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, alphaTest: 0.02, opacity, depthWrite: false });
   const plane = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
-  plane.position.set(x, y, -renderOrder * 0.01);
+  plane.position.set(x, y, z - renderOrder * 0.01);
   plane.renderOrder = renderOrder;
   return plane;
+}
+
+function makeBlock(width, height, depth, material, x, y, z = 0) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
 }
 
 function clearWorld() {
@@ -193,13 +229,21 @@ function setupLevel(index) {
 function addBackground(index) {
   const bgTexture = cloneAtlasTexture(textures.worlds, worldRect(index, "background"));
   for (let i = 0; i < 8; i += 1) {
-    worldRoot.add(makePlane(bgTexture, 17.5, 5.3, i * 15.8 + 1.2, 0.75, -1, 1));
+    worldRoot.add(makePlane(bgTexture, 17.5, 5.3, i * 15.8 + 1.2, 0.75, -1, 1, -5.8));
+  }
+  const floorBed = makeBlock(runtime.levelLength + 34, 0.42, 7.8, materialBank.blackGlass, runtime.levelLength / 2, runtime.groundY - 0.55, -0.55);
+  floorBed.receiveShadow = true;
+  worldRoot.add(floorBed);
+  for (let i = 0; i < 22; i += 1) {
+    const rail = makeBlock(0.08, 1.7 + (i % 3) * 0.22, 0.18, materialBank.side, i * 4.4 - 3, runtime.groundY + 0.05, -2.8 - (i % 2) * 0.35);
+    rail.rotation.z = (i % 2 ? -0.06 : 0.05);
+    worldRoot.add(rail);
   }
   const veil = new THREE.Mesh(
     new THREE.PlaneGeometry(runtime.levelLength + 32, 13.5),
     new THREE.MeshBasicMaterial({ color: LEVELS[index].tint, transparent: true, opacity: 0.08, depthWrite: false })
   );
-  veil.position.set(runtime.levelLength / 2, 0, 0.08);
+  veil.position.set(runtime.levelLength / 2, 0, -4.9);
   worldRoot.add(veil);
 }
 
@@ -221,8 +265,17 @@ function buildPlatforms(index) {
 
 function addPlatform(x, y, width, height, index, part) {
   const texture = cloneAtlasTexture(textures.worlds, worldRect(index, part));
-  const sprite = makePlane(texture, width, height, x, y, 2);
-  worldRoot.add(sprite);
+  const depth = 1.55 + (part === "tile" ? 0.25 : 0);
+  const body = makeBlock(width, height * 0.82, depth, materialBank.side, x, y - 0.1, 0);
+  const cap = makeBlock(width * 0.96, 0.14, depth * 0.9, materialBank.dark, x, y + height * 0.32, 0.05);
+  const sprite = makePlane(texture, width, height, x, y + 0.16, 8, 0.9, 0.84);
+  body.userData.decor = sprite;
+  worldRoot.add(body, cap, sprite);
+  if (part === "tile" && Math.abs(x % 8) < 2.9) {
+    const light = new THREE.PointLight(LEVELS[index].tint, 1.8, 4);
+    light.position.set(x, y + 0.35, 0.95);
+    worldRoot.add(light);
+  }
   runtime.platforms.push({ x, y, width, height });
 }
 
@@ -232,8 +285,10 @@ function buildProps(index) {
     const texture = cloneAtlasTexture(textures.worlds, worldRect(index, part));
     const x = 3 + i * (runtime.levelLength / 20) + ((i * 19) % 7) * 0.17;
     const y = runtime.groundY + 1.05 + (i % 2) * 0.18;
-    const sprite = makeSprite(texture, 1.15 + (i % 3) * 0.3, 1.45 + (i % 4) * 0.25, x, y, 8);
-    worldRoot.add(sprite);
+    const z = -0.8 - (i % 4) * 0.38;
+    const plinth = makeBlock(0.62 + (i % 3) * 0.12, 0.34, 0.7, materialBank.dark, x, runtime.groundY + 0.1, z + 0.08);
+    const sprite = makeSprite(texture, 1.15 + (i % 3) * 0.3, 1.45 + (i % 4) * 0.25, x, y, 18, z + 0.45);
+    worldRoot.add(plinth, sprite);
     runtime.props.push(sprite);
   }
 }
@@ -253,9 +308,13 @@ function spawnLoot(index) {
 
 function addLoot(key, x, y) {
   const texture = cloneAtlasTexture(textures.loot, lootRect(key));
-  const sprite = makeSprite(texture, key === "portalShard" ? 1.4 : 0.75, key === "portalShard" ? 1.4 : 0.75, x, y, 30);
+  const sprite = makeSprite(texture, key === "portalShard" ? 1.4 : 0.75, key === "portalShard" ? 1.4 : 0.75, x, y, 30, 1.1);
   sprite.userData = { key, taken: false, baseY: y, pulse: Math.random() * Math.PI * 2 };
+  const halo = new THREE.PointLight(LOOT[key].ability ? 0x75ff66 : 0x35f5ff, key === "portalShard" ? 4 : 1.4, key === "portalShard" ? 5 : 2.4);
+  halo.position.set(x, y, 1.2);
+  sprite.userData.halo = halo;
   worldRoot.add(sprite);
+  worldRoot.add(halo);
   runtime.loot.push(sprite);
   if (key !== "portalShard") state.totalLoot += 1;
 }
@@ -265,11 +324,14 @@ function spawnHazards(index) {
   for (let i = 0; i < level.hazards; i += 1) {
     const x = 8 + i * (runtime.levelLength - 16) / Math.max(1, level.hazards - 1);
     const y = i % 2 ? runtime.groundY + 0.72 : -1.1;
-    const hazard = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.32, i % 2 ? 1.35 : 0.32),
-      new THREE.MeshBasicMaterial({ color: 0xff7b29, transparent: true, opacity: 0.85, depthWrite: false })
-    );
-    hazard.position.set(x, y, -0.4);
+    const hazard = new THREE.Group();
+    const postA = makeBlock(0.28, i % 2 ? 1.4 : 0.45, 0.5, materialBank.amber, -0.42, 0, 0.78);
+    const postB = makeBlock(0.28, i % 2 ? 1.4 : 0.45, 0.5, materialBank.amber, 0.42, 0, 0.78);
+    const beam = makeBlock(1.08, 0.12, 0.16, materialBank.amber, 0, 0.18, 1.1);
+    const light = new THREE.PointLight(0xff9c2e, 3.5, 4.2);
+    light.position.set(0, 0.2, 1.35);
+    hazard.add(postA, postB, beam, light);
+    hazard.position.set(x, y, 0);
     hazard.userData = { x, y, phase: i * 1.7, radius: i % 2 ? 0.65 : 0.52 };
     worldRoot.add(hazard);
     runtime.hazards.push(hazard);
@@ -281,8 +343,15 @@ function buildPlayer() {
   player.velocity.set(0, 0);
   player.group.position.set(0, runtime.groundY + 1.05, 1);
   player.facing = 1;
-  player.sprite = makeSprite(textures.goblinIdle, 1.15, 1.55, 0, 0, 50);
-  player.group.add(player.sprite);
+  const shadow = new THREE.Mesh(
+    new THREE.CircleGeometry(0.42, 28),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.34, depthWrite: false })
+  );
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.set(0, -0.72, -0.04);
+  shadow.scale.z = 0.55;
+  player.sprite = makeSprite(textures.goblinIdle, 1.15, 1.55, 0, 0, 50, 0.2);
+  player.group.add(shadow, player.sprite);
 }
 
 function resetRun() {
@@ -382,6 +451,11 @@ function updateLoot(delta) {
       sprite.position.x += dx * delta * 2.3;
       sprite.position.y += dy * delta * 2.3;
     }
+    if (sprite.userData.halo) {
+      sprite.userData.halo.position.x = sprite.position.x;
+      sprite.userData.halo.position.y = sprite.position.y;
+      sprite.userData.halo.visible = sprite.visible;
+    }
     if (dist < 0.9) collectLoot(sprite);
   });
 }
@@ -425,7 +499,11 @@ function updateHazards(delta) {
   runtime.hazards.forEach((hazard) => {
     const active = Math.sin(performance.now() / 620 * state.difficulty + hazard.userData.phase) > -0.35;
     hazard.visible = active;
-    hazard.material.opacity = active ? 0.65 + Math.sin(performance.now() / 95) * 0.18 : 0.1;
+    const pulse = active ? 0.75 + Math.sin(performance.now() / 95) * 0.18 : 0.1;
+    hazard.children.forEach((child) => {
+      if (child.material?.emissiveIntensity !== undefined) child.material.emissiveIntensity = pulse * 1.6;
+      if (child.isPointLight) child.intensity = active ? 3.5 + pulse : 0;
+    });
     if (!active) return;
     const dx = player.group.position.x - hazard.position.x;
     const dy = player.group.position.y - hazard.position.y;
@@ -450,7 +528,9 @@ function updateCamera(delta) {
   const target = clamp(player.group.position.x + 4, 0, runtime.levelLength - 8);
   runtime.cameraX += (target - runtime.cameraX) * Math.min(1, delta * 4.5);
   camera.position.x = runtime.cameraX;
+  camera.lookAt(runtime.cameraX, -0.85, 0);
   glow.position.x = runtime.cameraX + 2;
+  keyLight.position.x = runtime.cameraX - 3;
 }
 
 function updateHud() {
@@ -495,12 +575,14 @@ function loop() {
 window.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
   if (["arrowleft", "arrowright", "arrowup", "arrowdown", " ", "shift"].includes(key)) event.preventDefault();
-  if (key === "r") resetRun();
+  if (key === "r" && assetsReady) resetRun();
   keys.add(key);
 });
 
 window.addEventListener("keyup", (event) => keys.delete(event.key.toLowerCase()));
-restart.addEventListener("click", resetRun);
+restart.addEventListener("click", () => {
+  if (assetsReady) resetRun();
+});
 
-resetRun();
-requestAnimationFrame(loop);
+setToast("Loading worlds", "Preparing 3D side-scroller atlases.", false);
+updateHud();
