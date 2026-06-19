@@ -1,0 +1,330 @@
+:root {
+  --black: #020604;
+  --bg: #07120a;
+  --panel: #0a1b0f;
+  --green: #75ff66;
+  --green-soft: #c7ffaf;
+  --cyan: #35f5ff;
+  --amber: #ffba3b;
+  --red: #ff583f;
+  --muted: rgba(208, 255, 196, 0.68);
+  --edge: rgba(117, 255, 102, 0.33);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(53, 245, 255, 0.12), transparent 24%),
+    radial-gradient(circle at 80% 85%, rgba(255, 186, 59, 0.1), transparent 22%),
+    linear-gradient(135deg, #07120a, #000);
+  color: var(--green);
+  font-family: "Courier New", "Lucida Console", Monaco, monospace;
+  letter-spacing: 0;
+}
+
+button,
+kbd {
+  font: inherit;
+}
+
+.shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: clamp(8px, 2vw, 24px);
+}
+
+.cabinet {
+  width: min(1460px, 98vw);
+  height: min(930px, 96vh);
+  min-height: 620px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: clamp(10px, 1.6vw, 22px);
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.08), transparent 19% 78%, rgba(117, 255, 102, 0.08)),
+    #030604;
+  border: 2px solid var(--edge);
+  box-shadow:
+    0 28px 90px rgba(0, 0, 0, 0.74),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.035),
+    inset 0 0 58px rgba(117, 255, 102, 0.08);
+}
+
+.hud {
+  display: grid;
+  grid-template-columns: minmax(330px, 1.4fr) repeat(3, minmax(132px, 0.5fr));
+  gap: 10px;
+}
+
+.brand,
+.meter,
+.keys,
+.toast {
+  background:
+    repeating-linear-gradient(to bottom, rgba(117, 255, 102, 0.055) 0 1px, transparent 1px 5px),
+    linear-gradient(180deg, rgba(10, 37, 17, 0.96), rgba(2, 10, 6, 0.98));
+  border: 1px solid var(--edge);
+  box-shadow:
+    inset 0 0 24px rgba(117, 255, 102, 0.1),
+    0 0 18px rgba(117, 255, 102, 0.06);
+}
+
+.brand {
+  min-height: 92px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+}
+
+.goblin-sigil {
+  position: relative;
+  width: 64px;
+  height: 50px;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 0 9px rgba(117, 255, 102, 0.72));
+}
+
+.goblin-sigil::before,
+.goblin-sigil::after {
+  content: "";
+  position: absolute;
+}
+
+.goblin-sigil::before {
+  inset: 4px 4px 2px;
+  background: var(--green);
+  clip-path: polygon(0 14%, 23% 34%, 34% 0, 66% 0, 77% 34%, 100% 14%, 86% 68%, 63% 100%, 37% 100%, 14% 68%);
+}
+
+.goblin-sigil::after {
+  inset: 20px 18px 12px;
+  background: #06130a;
+  clip-path: polygon(0 0, 34% 0, 34% 45%, 0 45%, 0 0, 66% 0, 100% 0, 100% 45%, 66% 45%, 66% 0);
+}
+
+h1 {
+  margin: 0;
+  color: var(--green);
+  font-size: clamp(26px, 3.4vw, 48px);
+  line-height: 0.95;
+  text-transform: uppercase;
+  text-shadow: 0 0 15px rgba(117, 255, 102, 0.68);
+}
+
+p {
+  margin: 8px 0 0;
+  color: var(--green-soft);
+  font-size: clamp(13px, 1.25vw, 17px);
+  text-transform: uppercase;
+}
+
+.meter {
+  min-height: 92px;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.meter span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.meter strong {
+  display: block;
+  color: var(--cyan);
+  font-size: clamp(25px, 3vw, 43px);
+  line-height: 1;
+  text-shadow: 0 0 16px rgba(53, 245, 255, 0.68);
+}
+
+.screen {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background: #010302;
+  border: 1px solid rgba(53, 245, 255, 0.3);
+  box-shadow:
+    inset 0 0 45px rgba(53, 245, 255, 0.1),
+    inset 0 0 130px rgba(0, 0, 0, 0.9);
+}
+
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.crt-lines,
+.crt-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.crt-lines {
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.055) 0,
+    rgba(255, 255, 255, 0.055) 1px,
+    transparent 2px,
+    transparent 5px
+  );
+  mix-blend-mode: screen;
+  opacity: 0.42;
+}
+
+.crt-vignette {
+  background:
+    linear-gradient(transparent 48%, rgba(117, 255, 102, 0.045) 50%, transparent 52%),
+    radial-gradient(ellipse at center, transparent 56%, rgba(0, 0, 0, 0.78));
+}
+
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  max-width: min(760px, calc(100% - 36px));
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 13px 18px;
+  transform: translateX(-50%);
+  color: var(--green-soft);
+  text-align: center;
+  text-transform: uppercase;
+  transition: opacity 180ms ease, transform 180ms ease, border-color 180ms ease;
+}
+
+.toast strong {
+  color: var(--green);
+  font-size: clamp(17px, 2vw, 25px);
+  white-space: nowrap;
+  text-shadow: 0 0 13px rgba(117, 255, 102, 0.62);
+}
+
+.toast span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.toast.is-quiet {
+  opacity: 0.14;
+  transform: translateX(-50%) translateY(7px);
+}
+
+.toast.is-loud {
+  border-color: rgba(53, 245, 255, 0.75);
+  box-shadow:
+    inset 0 0 25px rgba(53, 245, 255, 0.16),
+    0 0 28px rgba(53, 245, 255, 0.22);
+}
+
+.control-bar {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr 0.72fr;
+  gap: 10px;
+}
+
+.keys {
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 14px;
+  text-transform: uppercase;
+}
+
+.keys span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+kbd,
+button {
+  min-width: 38px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 10px;
+  color: var(--green);
+  background: #041009;
+  border: 1px solid rgba(117, 255, 102, 0.55);
+  box-shadow: inset 0 0 12px rgba(117, 255, 102, 0.11);
+  text-transform: uppercase;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover,
+button:focus-visible {
+  color: #06120b;
+  background: var(--green);
+  outline: none;
+}
+
+@media (max-width: 900px) {
+  body {
+    overflow: auto;
+  }
+
+  .shell {
+    min-height: 100svh;
+    padding: 8px;
+  }
+
+  .cabinet {
+    width: 100%;
+    height: 100svh;
+    min-height: 0;
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .hud {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .brand {
+    grid-column: 1 / -1;
+    min-height: 72px;
+  }
+
+  .goblin-sigil {
+    width: 48px;
+    height: 38px;
+  }
+
+  .meter {
+    min-height: 60px;
+  }
+
+  .control-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .keys {
+    min-height: 42px;
+  }
+
+  .toast {
+    flex-direction: column;
+    gap: 4px;
+    bottom: 10px;
+  }
+}
