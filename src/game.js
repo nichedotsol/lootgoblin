@@ -19,8 +19,8 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x020604);
 
 const camera = new THREE.OrthographicCamera(-12, 12, 6.75, -6.75, 0.1, 100);
-camera.position.set(0, 1.45, 13);
-camera.lookAt(0, -0.85, 0);
+camera.position.set(0, 0.55, 12);
+camera.lookAt(0, -1.15, 0);
 
 const worldRoot = new THREE.Group();
 scene.add(worldRoot);
@@ -101,8 +101,9 @@ const player = {
 };
 
 const materialBank = {
-  dark: new THREE.MeshStandardMaterial({ color: 0x111a17, roughness: 0.9, metalness: 0.08 }),
-  side: new THREE.MeshStandardMaterial({ color: 0x26342e, roughness: 0.85, metalness: 0.1 }),
+  dark: new THREE.MeshStandardMaterial({ color: 0x2b3630, emissive: 0x07150d, emissiveIntensity: 0.5, roughness: 0.82, metalness: 0.1 }),
+  side: new THREE.MeshStandardMaterial({ color: 0x46574c, emissive: 0x0e2719, emissiveIntensity: 0.45, roughness: 0.78, metalness: 0.12 }),
+  underside: new THREE.MeshStandardMaterial({ color: 0x18251f, emissive: 0x07150d, emissiveIntensity: 0.38, roughness: 0.9, metalness: 0.08 }),
   cyan: new THREE.MeshStandardMaterial({ color: 0x35f5ff, emissive: 0x0d8f94, emissiveIntensity: 1.35, roughness: 0.34 }),
   amber: new THREE.MeshStandardMaterial({ color: 0xff9c2e, emissive: 0xff6a00, emissiveIntensity: 1.4, roughness: 0.36 }),
   green: new THREE.MeshStandardMaterial({ color: 0x75ff66, emissive: 0x1f7a20, emissiveIntensity: 0.65, roughness: 0.6 }),
@@ -111,7 +112,7 @@ const materialBank = {
 
 const runtime = {
   levelLength: 72,
-  groundY: -3.65,
+  groundY: -2.72,
   cameraX: 0,
   platforms: [],
   loot: [],
@@ -229,13 +230,15 @@ function setupLevel(index) {
 function addBackground(index) {
   const bgTexture = cloneAtlasTexture(textures.worlds, worldRect(index, "background"));
   for (let i = 0; i < 8; i += 1) {
-    worldRoot.add(makePlane(bgTexture, 17.5, 5.3, i * 15.8 + 1.2, 0.75, -1, 1, -5.8));
+    worldRoot.add(makePlane(bgTexture, 18.4, 6.85, i * 16.4 + 1.2, 0.55, -1, 1, -6.2));
   }
-  const floorBed = makeBlock(runtime.levelLength + 34, 0.42, 7.8, materialBank.blackGlass, runtime.levelLength / 2, runtime.groundY - 0.55, -0.55);
+  const floorBed = makeBlock(runtime.levelLength + 34, 0.36, 5.2, materialBank.blackGlass, runtime.levelLength / 2, runtime.groundY - 0.56, -0.25);
   floorBed.receiveShadow = true;
   worldRoot.add(floorBed);
-  for (let i = 0; i < 22; i += 1) {
-    const rail = makeBlock(0.08, 1.7 + (i % 3) * 0.22, 0.18, materialBank.side, i * 4.4 - 3, runtime.groundY + 0.05, -2.8 - (i % 2) * 0.35);
+  const frontGlow = makeBlock(runtime.levelLength + 34, 0.06, 0.12, materialBank.green, runtime.levelLength / 2, runtime.groundY - 0.18, 2.38);
+  worldRoot.add(frontGlow);
+  for (let i = 0; i < 28; i += 1) {
+    const rail = makeBlock(0.06, 1.35 + (i % 3) * 0.18, 0.14, materialBank.side, i * 3.8 - 3, runtime.groundY + 0.0, -3.15 - (i % 2) * 0.28);
     rail.rotation.z = (i % 2 ? -0.06 : 0.05);
     worldRoot.add(rail);
   }
@@ -248,8 +251,8 @@ function addBackground(index) {
 }
 
 function buildGround(index) {
-  for (let x = -2; x < runtime.levelLength + 8; x += 2.8) {
-    addPlatform(x, runtime.groundY, 3.05, 0.78, index, x % 5 < 2 ? "tile" : "smallTile");
+  for (let x = -2; x < runtime.levelLength + 8; x += 2.45) {
+    addPlatform(x, runtime.groundY, 2.7, 0.72, index, x % 5 < 2 ? "tile" : "smallTile", true);
   }
 }
 
@@ -259,18 +262,19 @@ function buildPlatforms(index) {
     const x = 7 + i * (7.2 - Math.min(index, 5) * 0.25);
     const y = -2.1 + ((i * 37 + index * 11) % 34) / 10;
     const width = 2.4 + ((i + index) % 3) * 0.75;
-    addPlatform(x, y, width, 0.55, index, i % 2 ? "smallTile" : "tile");
+    addPlatform(x, y, width, 0.5, index, i % 2 ? "smallTile" : "tile", false);
   }
 }
 
-function addPlatform(x, y, width, height, index, part) {
+function addPlatform(x, y, width, height, index, part, isGround = false) {
   const texture = cloneAtlasTexture(textures.worlds, worldRect(index, part));
-  const depth = 1.55 + (part === "tile" ? 0.25 : 0);
-  const body = makeBlock(width, height * 0.82, depth, materialBank.side, x, y - 0.1, 0);
-  const cap = makeBlock(width * 0.96, 0.14, depth * 0.9, materialBank.dark, x, y + height * 0.32, 0.05);
-  const sprite = makePlane(texture, width, height, x, y + 0.16, 8, 0.9, 0.84);
+  const depth = isGround ? 1.9 : 1.28;
+  const body = makeBlock(width, height * 0.52, depth, materialBank.underside, x, y - height * 0.28, 0);
+  const cap = makeBlock(width * 0.96, 0.16, depth * 0.92, materialBank.side, x, y + height * 0.28, 0.1);
+  const lip = makeBlock(width * 0.86, 0.055, 0.16, materialBank.cyan, x, y + height * 0.47, 0.86);
+  const sprite = makePlane(texture, width, height * 0.92, x, y + 0.12, 10, 0.92, 1.02);
   body.userData.decor = sprite;
-  worldRoot.add(body, cap, sprite);
+  worldRoot.add(body, cap, lip, sprite);
   if (part === "tile" && Math.abs(x % 8) < 2.9) {
     const light = new THREE.PointLight(LEVELS[index].tint, 1.8, 4);
     light.position.set(x, y + 0.35, 0.95);
@@ -280,14 +284,19 @@ function addPlatform(x, y, width, height, index, part) {
 }
 
 function buildProps(index) {
-  for (let i = 0; i < 20; i += 1) {
+  for (let i = 0; i < 16; i += 1) {
     const part = ["propA", "propB", "propC"][i % 3];
     const texture = cloneAtlasTexture(textures.worlds, worldRect(index, part));
-    const x = 3 + i * (runtime.levelLength / 20) + ((i * 19) % 7) * 0.17;
-    const y = runtime.groundY + 1.05 + (i % 2) * 0.18;
-    const z = -0.8 - (i % 4) * 0.38;
-    const plinth = makeBlock(0.62 + (i % 3) * 0.12, 0.34, 0.7, materialBank.dark, x, runtime.groundY + 0.1, z + 0.08);
-    const sprite = makeSprite(texture, 1.15 + (i % 3) * 0.3, 1.45 + (i % 4) * 0.25, x, y, 18, z + 0.45);
+    const x = 3 + i * (runtime.levelLength / 16) + ((i * 19) % 7) * 0.12;
+    const y = runtime.groundY + 0.72 + (i % 2) * 0.16;
+    const z = -1.45 - (i % 3) * 0.45;
+    const plinth = makeBlock(0.42 + (i % 3) * 0.08, 0.2, 0.46, materialBank.dark, x, runtime.groundY - 0.03, z + 0.04);
+    const sprite = makeSprite(texture, 0.82 + (i % 3) * 0.22, 1.08 + (i % 4) * 0.18, x, y, 18, z + 0.28);
+    if (i % 5 === 0) {
+      const light = new THREE.PointLight(LEVELS[index].tint, 1.5, 3);
+      light.position.set(x, y + 0.1, z + 0.6);
+      worldRoot.add(light);
+    }
     worldRoot.add(plinth, sprite);
     runtime.props.push(sprite);
   }
@@ -556,7 +565,7 @@ function resize() {
   const height = canvas.clientHeight;
   if (canvas.width !== width || canvas.height !== height) renderer.setSize(width, height, false);
   const aspect = width / Math.max(height, 1);
-  const frustum = 6.2;
+  const frustum = 4.55;
   camera.left = -frustum * aspect;
   camera.right = frustum * aspect;
   camera.top = frustum;
