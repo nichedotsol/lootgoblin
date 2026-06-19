@@ -4,7 +4,7 @@ A tiny browser minigame about hunting compute tokens in a cursed terminal ruin.
 
 ## Play
 
-Open `index.html` in a browser, or serve the repo with any static file host.
+Open `index.html` in a browser.
 
 Controls:
 
@@ -14,7 +14,7 @@ Controls:
 
 ## Goal
 
-Collect all 12 compute tokens before time runs out. Audit beams burn time and score, so watch their rhythm and dash through the gaps.
+Collect all 15 compute tokens before time runs out. Audit beams burn time and score, so watch their rhythm and dash through the gaps.
 
 ## Tech
 

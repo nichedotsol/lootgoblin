@@ -17,13 +17,13 @@
           <div class="brand">
             <span class="goblin-sigil" aria-hidden="true"></span>
             <div>
-              <h1>Loot Goblin</h1>
-              <p>Hunt compute tokens in the terminal bog.</p>
+              <h1>Compute Token Hunt</h1>
+              <p>Find the tokens. Don't get zapped.</p>
             </div>
           </div>
           <div class="meter">
             <span>Tokens</span>
-            <strong><span id="token-count">0</span>/12</strong>
+            <strong><span id="token-count">0</span>/15</strong>
           </div>
           <div class="meter">
             <span>Score</span>
@@ -32,6 +32,10 @@
           <div class="meter">
             <span>Time</span>
             <strong id="timer">01:45</strong>
+          </div>
+          <div class="meter signal-meter">
+            <span>CPU OK</span>
+            <strong aria-hidden="true">⌁─╱╲─•─•</strong>
           </div>
         </header>
 
@@ -46,9 +50,12 @@
         </div>
 
         <footer class="control-bar" aria-label="Controls">
-          <div class="keys"><span>Move</span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div>
+          <div class="keys move-keys"><span>Move</span><kbd>↑</kbd><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div>
           <div class="keys"><span>Dash</span><kbd>Shift</kbd></div>
-          <div class="keys"><span>Restart</span><button id="restart" type="button">R</button></div>
+          <div class="keys"><span>Avoid</span><span class="skull" aria-hidden="true"></span><small>Zaps</small></div>
+          <div class="keys"><span>Collect</span><span class="token-icon" aria-hidden="true"></span><small>Tokens</small></div>
+          <div class="keys directive"><span class="goblin-pixel" aria-hidden="true"></span><strong>Grab all tokens before time runs out!</strong></div>
+          <div class="keys restart-keys"><button id="restart" type="button">Restart [R]</button><span class="tiny-goblin" aria-hidden="true"></span></div>
         </footer>
       </section>
     </main>

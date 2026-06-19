@@ -38,21 +38,22 @@ kbd {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: clamp(8px, 2vw, 24px);
+  padding: clamp(6px, 1.1vw, 14px);
 }
 
 .cabinet {
-  width: min(1460px, 98vw);
-  height: min(930px, 96vh);
+  width: min(1500px, 98vw);
+  height: min(930px, 98vh);
   min-height: 620px;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 12px;
-  padding: clamp(10px, 1.6vw, 22px);
+  gap: 8px;
+  padding: clamp(8px, 1.1vw, 14px);
   background:
     linear-gradient(120deg, rgba(255, 255, 255, 0.08), transparent 19% 78%, rgba(117, 255, 102, 0.08)),
     #030604;
-  border: 2px solid var(--edge);
+  border: 2px solid rgba(38, 86, 52, 0.88);
+  border-radius: 20px;
   box-shadow:
     0 28px 90px rgba(0, 0, 0, 0.74),
     inset 0 0 0 2px rgba(255, 255, 255, 0.035),
@@ -61,8 +62,8 @@ kbd {
 
 .hud {
   display: grid;
-  grid-template-columns: minmax(330px, 1.4fr) repeat(3, minmax(132px, 0.5fr));
-  gap: 10px;
+  grid-template-columns: minmax(440px, 1.55fr) minmax(150px, 0.56fr) minmax(205px, 0.72fr) minmax(155px, 0.56fr) minmax(210px, 0.74fr);
+  gap: 8px;
 }
 
 .brand,
@@ -73,23 +74,24 @@ kbd {
     repeating-linear-gradient(to bottom, rgba(117, 255, 102, 0.055) 0 1px, transparent 1px 5px),
     linear-gradient(180deg, rgba(10, 37, 17, 0.96), rgba(2, 10, 6, 0.98));
   border: 1px solid var(--edge);
+  border-radius: 3px;
   box-shadow:
     inset 0 0 24px rgba(117, 255, 102, 0.1),
     0 0 18px rgba(117, 255, 102, 0.06);
 }
 
 .brand {
-  min-height: 92px;
+  min-height: 76px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   padding: 14px 18px;
 }
 
 .goblin-sigil {
   position: relative;
-  width: 64px;
-  height: 50px;
+  width: 50px;
+  height: 38px;
   flex: 0 0 auto;
   filter: drop-shadow(0 0 9px rgba(117, 255, 102, 0.72));
 }
@@ -115,21 +117,21 @@ kbd {
 h1 {
   margin: 0;
   color: var(--green);
-  font-size: clamp(26px, 3.4vw, 48px);
-  line-height: 0.95;
+  font-size: clamp(20px, 1.95vw, 30px);
+  line-height: 1;
   text-transform: uppercase;
   text-shadow: 0 0 15px rgba(117, 255, 102, 0.68);
 }
 
 p {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: var(--green-soft);
   font-size: clamp(13px, 1.25vw, 17px);
   text-transform: uppercase;
 }
 
 .meter {
-  min-height: 92px;
+  min-height: 76px;
   display: grid;
   place-items: center;
   padding: 12px;
@@ -145,9 +147,14 @@ p {
 .meter strong {
   display: block;
   color: var(--cyan);
-  font-size: clamp(25px, 3vw, 43px);
+  font-size: clamp(24px, 2.6vw, 38px);
   line-height: 1;
   text-shadow: 0 0 16px rgba(53, 245, 255, 0.68);
+}
+
+.signal-meter strong {
+  color: var(--green);
+  font-size: clamp(20px, 2.25vw, 34px);
 }
 
 .screen {
@@ -234,17 +241,18 @@ canvas {
 
 .control-bar {
   display: grid;
-  grid-template-columns: 1.15fr 0.85fr 0.72fr;
-  gap: 10px;
+  grid-template-columns: 1.15fr 0.72fr 0.74fr 0.74fr 1.7fr 1.25fr;
+  gap: 8px;
 }
 
 .keys {
-  min-height: 70px;
+  min-height: 78px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 10px 14px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 9px 12px;
   text-transform: uppercase;
 }
 
@@ -269,6 +277,96 @@ button {
 
 button {
   cursor: pointer;
+}
+
+.restart-keys button {
+  min-width: 170px;
+  height: 42px;
+  color: var(--green);
+  font-size: 24px;
+}
+
+.keys small {
+  width: 100%;
+  color: var(--green);
+  font-size: 12px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.directive {
+  gap: 16px;
+}
+
+.directive strong {
+  color: var(--green);
+  font-size: clamp(15px, 1.4vw, 21px);
+  line-height: 1.2;
+  text-align: center;
+  text-shadow: 0 0 14px rgba(117, 255, 102, 0.6);
+}
+
+.skull,
+.token-icon,
+.goblin-pixel,
+.tiny-goblin {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.skull {
+  width: 48px;
+  height: 34px;
+  border: 2px solid var(--green);
+  border-radius: 50% 50% 35% 35%;
+}
+
+.skull::before,
+.skull::after {
+  content: "";
+  position: absolute;
+  top: 11px;
+  width: 8px;
+  height: 8px;
+  background: var(--green);
+}
+
+.skull::before {
+  left: 11px;
+}
+
+.skull::after {
+  right: 11px;
+}
+
+.token-icon {
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--cyan);
+  transform: rotate(30deg);
+  box-shadow: 0 0 16px rgba(53, 245, 255, 0.8);
+}
+
+.token-icon::after {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border: 2px solid var(--cyan);
+}
+
+.goblin-pixel,
+.tiny-goblin {
+  width: 64px;
+  height: 44px;
+  background: var(--green);
+  clip-path: polygon(0 25%, 24% 40%, 35% 0, 65% 0, 76% 40%, 100% 25%, 86% 76%, 62% 100%, 38% 100%, 14% 76%);
+  filter: drop-shadow(0 0 10px rgba(117, 255, 102, 0.65));
+}
+
+.tiny-goblin {
+  width: 46px;
+  height: 34px;
 }
 
 button:hover,
@@ -316,6 +414,10 @@ button:focus-visible {
 
   .control-bar {
     grid-template-columns: 1fr;
+  }
+
+  .signal-meter {
+    display: none;
   }
 
   .keys {

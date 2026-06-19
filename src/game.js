@@ -13,7 +13,7 @@ const world = {
 };
 
 const keys = new Set();
-const totalTokens = 12;
+const totalTokens = 15;
 let state;
 let lastFrame = performance.now();
 
@@ -30,18 +30,27 @@ const tokenSeeds = [
   [1064, 436],
   [218, 336],
   [766, 176],
+  [602, 168],
+  [1038, 330],
+  [434, 548],
 ];
 
 const props = [
-  { type: "terminal", x: 180, y: 236, scale: 1.18, label: "NODE 7" },
-  { type: "terminal", x: 1090, y: 232, scale: 1.05, label: "CACHE" },
-  { type: "obelisk", x: 552, y: 170, scale: 1.18 },
+  { type: "terminal", x: 172, y: 244, scale: 1.42, label: "SYS OK", side: "left" },
+  { type: "terminal", x: 1078, y: 235, scale: 1.22, label: "?", side: "right" },
+  { type: "obelisk", x: 548, y: 168, scale: 1.22 },
+  { type: "shrine", x: 835, y: 174, scale: 1.08 },
+  { type: "node", x: 650, y: 196, scale: 0.9 },
   { type: "crate", x: 905, y: 552, scale: 1 },
   { type: "crate", x: 1012, y: 402, scale: 0.86 },
-  { type: "sign", x: 142, y: 535, scale: 1, label: "LOOT" },
-  { type: "sign", x: 1142, y: 548, scale: 1, label: "AUDIT" },
+  { type: "sign", x: 135, y: 535, scale: 1, label: "D3PTH ->" },
+  { type: "sign", x: 1140, y: 545, scale: 1, label: "DANGER" },
   { type: "crystal", x: 414, y: 592, scale: 1 },
   { type: "crystal", x: 1118, y: 430, scale: 0.82 },
+  { type: "crystal", x: 962, y: 634, scale: 1.2 },
+  { type: "mushrooms", x: 82, y: 510, scale: 1 },
+  { type: "plant", x: 176, y: 606, scale: 0.9 },
+  { type: "plant", x: 1018, y: 640, scale: 1.05 },
 ];
 
 const beams = [
@@ -190,10 +199,23 @@ function drawBackdrop() {
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, world.width, world.height);
 
-  for (let i = 0; i < 34; i += 1) {
+  ctx.save();
+  ctx.globalAlpha = 0.92;
+  for (let i = 0; i < 40; i += 1) {
     const x = 24 + i * 39;
     const h = 84 + ((i * 47) % 170);
-    drawRockColumn(x, 104 + ((i * 31) % 74), h, 18 + (i % 3) * 8);
+    drawRockColumn(x, 92 + ((i * 31) % 86), h, 18 + (i % 3) * 8);
+  }
+  ctx.restore();
+
+  ctx.strokeStyle = "rgba(255, 186, 59, 0.16)";
+  ctx.lineWidth = 3;
+  for (let i = 0; i < 7; i += 1) {
+    const x = 106 + i * 176;
+    ctx.beginPath();
+    ctx.moveTo(x, 152 + (i % 3) * 14);
+    ctx.lineTo(x + 88, 108 + (i % 2) * 18);
+    ctx.stroke();
   }
 }
 
@@ -202,6 +224,7 @@ function drawFloor() {
   ctx.translate(0, 8);
   drawEllipse(640, 390, 524, 240, "#102818", "#354f35");
   drawEllipse(640, 390, 454, 193, "#19351e", "rgba(117, 255, 102, 0.18)");
+  drawMoss(640, 390, 508, 226);
 
   ctx.lineWidth = 2;
   ctx.strokeStyle = "rgba(109, 139, 102, 0.35)";
@@ -211,14 +234,15 @@ function drawFloor() {
     ctx.stroke();
   }
 
-  for (let i = 0; i < 128; i += 1) {
+  for (let i = 0; i < 168; i += 1) {
     const angle = (i * 137.5 * Math.PI) / 180;
     const radius = 40 + (i % 16) * 30;
     const x = 640 + Math.cos(angle) * radius * 1.45;
     const y = 390 + Math.sin(angle) * radius * 0.64;
     if (x < 110 || x > 1170 || y < 125 || y > 650) continue;
-    drawSlab(x, y, 32 + (i % 5) * 8, 17 + (i % 4) * 5, (i % 7) * 0.16);
+    drawSlab(x, y, 30 + (i % 5) * 9, 16 + (i % 4) * 6, (i % 7) * 0.16);
   }
+  drawRingPlatform(678, 333);
   ctx.restore();
 }
 
@@ -275,9 +299,13 @@ function drawProps() {
   for (const prop of [...props].sort((a, b) => a.y - b.y)) {
     if (prop.type === "terminal") drawTerminal(prop);
     if (prop.type === "obelisk") drawObelisk(prop);
+    if (prop.type === "shrine") drawShrine(prop);
+    if (prop.type === "node") drawDataNode(prop);
     if (prop.type === "crate") drawCrate(prop);
     if (prop.type === "sign") drawSign(prop);
     if (prop.type === "crystal") drawCrystal(prop);
+    if (prop.type === "plant") drawPlant(prop);
+    if (prop.type === "mushrooms") drawMushrooms(prop);
   }
 }
 
@@ -352,22 +380,42 @@ function drawParticles() {
   }
 }
 
-function drawTerminal({ x, y, scale, label }) {
+function drawTerminal({ x, y, scale, label, side }) {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
-  drawIsoBox(-54, -50, 108, 110, 22, "#151c18", "#28342c", "#080d09");
+  ctx.rotate(side === "left" ? -0.08 : 0.08);
+  drawIsoBox(-58, -58, 116, 122, 24, "#27302c", "#121b18", "#070c08");
+  ctx.strokeStyle = "rgba(255, 186, 59, 0.42)";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(-55, -40);
+  ctx.lineTo(-38, -57);
+  ctx.moveTo(42, -56);
+  ctx.lineTo(58, -38);
+  ctx.stroke();
   ctx.fillStyle = "#06120b";
-  roundRect(-36, -32, 72, 58, 5);
+  roundRect(-40, -38, 80, 66, 5);
   ctx.fillStyle = "#75ff66";
-  ctx.font = "12px Courier New";
-  ctx.fillText(label, -24, -9);
-  ctx.fillText("> HASH", -26, 8);
-  ctx.fillText("> 1203", -26, 25);
+  ctx.shadowColor = "#75ff66";
+  ctx.shadowBlur = 9;
+  ctx.font = "10px Courier New";
+  if (label === "?") {
+    ctx.font = "42px Courier New";
+    ctx.fillText("?", -12, 10);
+  } else {
+    ctx.fillText("> SYS.OK", -30, -20);
+    ctx.fillText("> GRID.ONLINE", -30, -6);
+    ctx.fillText("> NODES: 42", -30, 8);
+    ctx.fillText("> PACKETS: 1203", -30, 22);
+    ctx.fillText(">_", -30, 44);
+  }
+  ctx.shadowBlur = 0;
   ctx.fillStyle = "#ffba3b";
-  ctx.fillRect(-35, 46, 10, 8);
-  ctx.fillRect(-18, 46, 10, 8);
-  ctx.fillRect(-1, 46, 10, 8);
+  for (let i = 0; i < 4; i += 1) {
+    ctx.fillRect(-40 + i * 18, 48, 10, 8);
+  }
+  drawIsoBox(-46, 60, 92, 18, 12, "#382710", "#1b1005", "#080604");
   ctx.restore();
 }
 
@@ -390,6 +438,34 @@ function drawObelisk({ x, y, scale }) {
   ctx.lineWidth = 3;
   ctx.stroke();
   drawIsoBox(-56, 35, 112, 34, 18, "#24352f", "#1a2923", "#0b110d");
+  ctx.restore();
+}
+
+function drawShrine({ x, y, scale }) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  drawIsoBox(-54, -34, 108, 82, 20, "#394339", "#1b241d", "#101611");
+  drawIsoBox(-38, -66, 76, 46, 15, "#50594c", "#263028", "#151b16");
+  ctx.fillStyle = "#ffba3b";
+  ctx.shadowColor = "#ffba3b";
+  ctx.shadowBlur = 12;
+  roundRect(-8, -24, 16, 44, 6);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+function drawDataNode({ x, y, scale }) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  drawIsoBox(-28, -22, 56, 44, 13, "#22312d", "#111c18", "#07100b");
+  ctx.fillStyle = "#35f5ff";
+  ctx.shadowColor = "#35f5ff";
+  ctx.shadowBlur = 16;
+  roundRect(-16, -16, 32, 10, 4);
+  ctx.fillStyle = "#75ff66";
+  ctx.fillRect(-5, -2, 10, 10);
   ctx.restore();
 }
 
@@ -416,11 +492,49 @@ function drawSign({ x, y, scale, label }) {
   ctx.stroke();
   ctx.fillStyle = "#3a2a17";
   roundRect(-52, -24, 104, 52, 4);
-  ctx.fillStyle = label === "AUDIT" ? "#ff583f" : "#d5f2a7";
-  ctx.font = "18px Courier New";
+  ctx.fillStyle = label === "DANGER" ? "#ff583f" : "#d5f2a7";
+  ctx.font = "15px Courier New";
   ctx.textAlign = "center";
   ctx.fillText(label, 0, 8);
   ctx.textAlign = "start";
+  ctx.restore();
+}
+
+function drawPlant({ x, y, scale }) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.shadowColor = "#75ff66";
+  ctx.shadowBlur = 12;
+  for (let i = 0; i < 8; i += 1) {
+    const angle = -Math.PI / 2 + (i - 3.5) * 0.27;
+    ctx.fillStyle = i % 2 ? "#5fff39" : "#2bbf34";
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(angle) * 20, Math.sin(angle) * 54);
+    ctx.lineTo(Math.cos(angle + 0.22) * 10, Math.sin(angle + 0.22) * 30);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawMushrooms({ x, y, scale }) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  for (const cap of [
+    [-16, 8, 18],
+    [10, -2, 22],
+    [34, 10, 15],
+  ]) {
+    ctx.fillStyle = "#d9c46b";
+    roundRect(cap[0] - 4, cap[1] + 2, 8, 26, 4);
+    ctx.fillStyle = "#8b3b26";
+    ctx.beginPath();
+    ctx.ellipse(cap[0], cap[1], cap[2], cap[2] * 0.58, 0, Math.PI, 0);
+    ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -477,6 +591,47 @@ function drawEllipse(x, y, rx, ry, fill, stroke) {
   ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+}
+
+function drawMoss(cx, cy, rx, ry) {
+  ctx.save();
+  ctx.fillStyle = "rgba(82, 154, 45, 0.42)";
+  for (let i = 0; i < 115; i += 1) {
+    const angle = (i * 2.399963) % (Math.PI * 2);
+    const radius = Math.sqrt((i * 37) % 1000) / Math.sqrt(1000);
+    const x = cx + Math.cos(angle) * rx * radius;
+    const y = cy + Math.sin(angle) * ry * radius;
+    if ((x - cx) ** 2 / rx ** 2 + (y - cy) ** 2 / ry ** 2 > 1) continue;
+    ctx.beginPath();
+    ctx.ellipse(x, y, 20 + (i % 5) * 7, 8 + (i % 4) * 4, (i % 8) * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawRingPlatform(x, y) {
+  ctx.save();
+  ctx.translate(x, y);
+  for (let i = 5; i >= 0; i -= 1) {
+    ctx.strokeStyle = i % 2 ? "rgba(115, 132, 112, 0.7)" : "rgba(38, 54, 44, 0.9)";
+    ctx.lineWidth = 13;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 42 + i * 26, 17 + i * 12, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#1b241f";
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 42, 20, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(207, 255, 196, 0.18)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-28, -10);
+  ctx.lineTo(28, 10);
+  ctx.moveTo(28, -10);
+  ctx.lineTo(-28, 10);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawHex(x, y, radius, fill, stroke) {
