@@ -23,4 +23,5 @@ This version is intentionally static and build-free:
 - HTML/CSS app shell
 - Three.js-rendered 3D world, props, player, hazards, particles, and collectibles
 - Three.js loaded as an ES module from jsDelivr
+- Authored artifact registries for compute tokens, ruin objects, and audit beams
 - No build step

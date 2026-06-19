@@ -7,7 +7,6 @@ const timerReadout = document.querySelector("#timer");
 const toast = document.querySelector("#toast");
 const restart = document.querySelector("#restart");
 
-const totalTokens = 15;
 const keys = new Set();
 const clock = new THREE.Clock();
 const worldBounds = { minX: -11, maxX: 11, minZ: -5.7, maxZ: 5.7 };
@@ -92,27 +91,54 @@ const player = {
   invulnerable: 0,
 };
 
-const tokenSeeds = [
-  [-7.5, 3.1],
-  [-5.8, -1.6],
-  [-3.5, 1.8],
-  [-1.1, 4.4],
-  [0.0, -3.4],
-  [2.0, 2.6],
-  [3.9, -0.6],
-  [5.4, 4.0],
-  [6.7, -3.1],
-  [8.2, 1.7],
-  [-8.7, -0.5],
-  [1.7, -4.2],
-  [-1.0, -4.7],
-  [7.9, -0.7],
-  [-4.2, 4.3],
-];
-
 const tokens = [];
 const beams = [];
 const particles = [];
+
+const COMPUTE_TOKEN_ARTIFACTS = [
+  { name: "cold-wallet-cipher", x: -7.5, z: 3.1 },
+  { name: "moss-cache-thread", x: -5.8, z: -1.6 },
+  { name: "left-terminal-orbit", x: -3.5, z: 1.8 },
+  { name: "north-rune-cache", x: -1.1, z: 4.4 },
+  { name: "center-ring-spark", x: 0.0, z: -3.4 },
+  { name: "audit-gap-shard", x: 2.0, z: 2.6 },
+  { name: "right-ring-spark", x: 3.9, z: -0.6 },
+  { name: "shrine-cache-sigil", x: 5.4, z: 4.0 },
+  { name: "green-crystal-orbit", x: 6.7, z: -3.1 },
+  { name: "danger-post-chip", x: 8.2, z: 1.7 },
+  { name: "depth-sign-spark", x: -8.7, z: -0.5 },
+  { name: "south-ring-chip", x: 1.7, z: -4.2 },
+  { name: "southwest-cache", x: -1.0, z: -4.7 },
+  { name: "right-terminal-orbit", x: 7.9, z: -0.7 },
+  { name: "obelisk-echo", x: -4.2, z: 4.3 },
+];
+
+const RUIN_ARTIFACTS = [
+  { kind: "terminal", name: "packet-monolith", x: -8.3, z: -1.8, scale: 1.25, rotation: -0.23, lines: ["> SYS.OK", "> GRID.ONLINE", "> NODES: 42", "> PACKETS: 1203", ">_"] },
+  { kind: "terminal", name: "question-cache", x: 8.0, z: -1.7, scale: 1.1, rotation: 0.18, lines: ["", "     ?", "", "----"] },
+  { kind: "obelisk", name: "cyan-memory-obelisk", x: -2.4, z: -3.6, scale: 1.05 },
+  { kind: "shrine", name: "amber-runtime-shrine", x: 4.5, z: -3.2, scale: 1 },
+  { kind: "node", name: "micro-cache-node", x: -0.35, z: -3.35, scale: 0.9 },
+  { kind: "beamMachine", name: "audit-emitter-west", x: 5.8, z: 3.5, scale: 0.9 },
+  { kind: "beamMachine", name: "audit-emitter-east", x: 8.3, z: 0.6, scale: 0.75 },
+  { kind: "crate", name: "golden-packet-crate", x: 2.3, z: 2.2, scale: 0.76 },
+  { kind: "crate", name: "burnt-relay-crate", x: -3.2, z: 0.4, scale: 0.62 },
+  { kind: "sign", name: "depth-marker", x: -8.8, z: 3.6, label: "D3PTH ->", danger: false },
+  { kind: "sign", name: "danger-marker", x: 8.9, z: 3.6, label: "DANGER", danger: true },
+  { kind: "crystal", name: "east-green-crystal", x: 8.5, z: 1.8, scale: 1.1 },
+  { kind: "crystal", name: "south-green-crystal", x: 5.6, z: 5.0, scale: 1.25 },
+  { kind: "plant", name: "left-glow-grass", x: -8.0, z: 5.0, scale: 0.85 },
+  { kind: "plant", name: "right-glow-grass", x: 7.0, z: 5.0, scale: 0.8 },
+  { kind: "mushrooms", name: "left-rust-caps", x: -9.6, z: 2.5, scale: 0.9 },
+];
+
+const AUDIT_BEAM_ARTIFACTS = [
+  { name: "left-sweep", x1: -6.0, z1: -0.6, x2: -2.9, z2: -2.2, phase: 1.7, speed: 1.04 },
+  { name: "right-sweep", x1: 4.3, z1: 4.1, x2: 8.1, z2: 1.1, phase: 0.1, speed: 1.18 },
+  { name: "south-sweep", x1: -0.6, z1: 4.7, x2: 2.2, z2: 1.6, phase: 2.5, speed: 0.95 },
+];
+
+const totalTokens = COMPUTE_TOKEN_ARTIFACTS.length;
 
 function makeBox(width, height, depth, material, position, rotationY = 0) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
@@ -179,30 +205,49 @@ function setupWorld() {
   for (let i = 0; i < 95; i += 1) addMoss(i);
   for (let i = 0; i < 38; i += 1) addBackWallShard(i);
 
-  addTerminal(-8.3, -1.8, 1.25, -0.23, ["> SYS.OK", "> GRID.ONLINE", "> NODES: 42", "> PACKETS: 1203", ">_"]);
-  addTerminal(8.0, -1.7, 1.1, 0.18, ["", "     ?", "", "----"]);
-  addObelisk(-2.4, -3.6, 1.05);
-  addShrine(4.5, -3.2, 1);
-  addDataNode(-0.35, -3.35, 0.9);
-  addBeamMachine(5.8, 3.5, 0.9);
-  addBeamMachine(8.3, 0.6, 0.75);
-  addCrate(2.3, 2.2, 0.76);
-  addCrate(-3.2, 0.4, 0.62);
-  addSign(-8.8, 3.6, "D3PTH ->", false);
-  addSign(8.9, 3.6, "DANGER", true);
-  addCrystal(8.5, 1.8, 1.1);
-  addCrystal(5.6, 5.0, 1.25);
-  addPlant(-8.0, 5.0, 0.85);
-  addPlant(7.0, 5.0, 0.8);
-  addMushrooms(-9.6, 2.5, 0.9);
-
-  tokenSeeds.forEach(([x, z], index) => addToken(x, z, index));
-  addAuditBeam(-6.0, -0.6, -2.9, -2.2, 1.7, 1.04);
-  addAuditBeam(4.3, 4.1, 8.1, 1.1, 0.1, 1.18);
-  addAuditBeam(-0.6, 4.7, 2.2, 1.6, 2.5, 0.95);
+  RUIN_ARTIFACTS.forEach(spawnRuinArtifact);
+  COMPUTE_TOKEN_ARTIFACTS.forEach((artifact, index) => addToken(artifact, index));
+  AUDIT_BEAM_ARTIFACTS.forEach(addAuditBeam);
 
   buildPlayer();
   root.add(player.group);
+}
+
+function spawnRuinArtifact(artifact) {
+  switch (artifact.kind) {
+    case "terminal":
+      addTerminal(artifact);
+      break;
+    case "obelisk":
+      addObelisk(artifact);
+      break;
+    case "shrine":
+      addShrine(artifact);
+      break;
+    case "node":
+      addDataNode(artifact);
+      break;
+    case "beamMachine":
+      addBeamMachine(artifact);
+      break;
+    case "crate":
+      addCrate(artifact);
+      break;
+    case "sign":
+      addSign(artifact);
+      break;
+    case "crystal":
+      addCrystal(artifact);
+      break;
+    case "plant":
+      addPlant(artifact);
+      break;
+    case "mushrooms":
+      addMushrooms(artifact);
+      break;
+    default:
+      throw new Error(`Unknown ruin artifact: ${artifact.kind}`);
+  }
 }
 
 function addSlab(i) {
@@ -243,7 +288,7 @@ function addBackWallShard(i) {
   root.add(shard);
 }
 
-function addTerminal(x, z, scale, rotation, lines) {
+function addTerminal({ x, z, scale, rotation, lines }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.rotation.y = rotation;
@@ -257,7 +302,7 @@ function addTerminal(x, z, scale, rotation, lines) {
   root.add(group);
 }
 
-function addObelisk(x, z, scale) {
+function addObelisk({ x, z, scale }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
@@ -277,7 +322,7 @@ function addObelisk(x, z, scale) {
   root.add(group);
 }
 
-function addShrine(x, z, scale) {
+function addShrine({ x, z, scale }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
@@ -290,7 +335,7 @@ function addShrine(x, z, scale) {
   root.add(group);
 }
 
-function addDataNode(x, z, scale) {
+function addDataNode({ x, z, scale }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
@@ -300,7 +345,7 @@ function addDataNode(x, z, scale) {
   root.add(group);
 }
 
-function addBeamMachine(x, z, scale) {
+function addBeamMachine({ x, z, scale }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
@@ -309,7 +354,7 @@ function addBeamMachine(x, z, scale) {
   root.add(group);
 }
 
-function addCrate(x, z, scale) {
+function addCrate({ x, z, scale }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
@@ -318,7 +363,7 @@ function addCrate(x, z, scale) {
   root.add(group);
 }
 
-function addSign(x, z, label, danger) {
+function addSign({ x, z, label, danger }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.rotation.y = x < 0 ? -0.18 : 0.18;
@@ -330,7 +375,7 @@ function addSign(x, z, label, danger) {
   root.add(group);
 }
 
-function addCrystal(x, z, scale) {
+function addCrystal({ x, z, scale }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
@@ -343,7 +388,7 @@ function addCrystal(x, z, scale) {
   root.add(group);
 }
 
-function addPlant(x, z, scale) {
+function addPlant({ x, z, scale }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
@@ -357,7 +402,7 @@ function addPlant(x, z, scale) {
   root.add(group);
 }
 
-function addMushrooms(x, z, scale) {
+function addMushrooms({ x, z, scale }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
@@ -369,7 +414,7 @@ function addMushrooms(x, z, scale) {
   root.add(group);
 }
 
-function addToken(x, z, index) {
+function addToken({ name, x, z }, index) {
   const group = new THREE.Group();
   group.position.set(x, 0.78, z);
   const token = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.12, 6), shared.token);
@@ -379,12 +424,12 @@ function addToken(x, z, index) {
   inner.scale.set(0.7, 0.7, 1);
   const light = new THREE.PointLight(colors.cyan, 5.6, 4);
   group.add(token, inner, light);
-  group.userData = { index, taken: false, baseY: 0.78, pulse: Math.random() * Math.PI * 2 };
+  group.userData = { name, index, taken: false, baseY: 0.78, pulse: Math.random() * Math.PI * 2 };
   tokens.push(group);
   root.add(group);
 }
 
-function addAuditBeam(x1, z1, x2, z2, phase, speed) {
+function addAuditBeam({ name, x1, z1, x2, z2, phase, speed }) {
   const group = new THREE.Group();
   const a = new THREE.Vector3(x1, 0.58, z1);
   const b = new THREE.Vector3(x2, 0.58, z2);
@@ -396,7 +441,7 @@ function addAuditBeam(x1, z1, x2, z2, phase, speed) {
   const light = new THREE.PointLight(colors.amber, 3.8, 6);
   light.position.copy(mid);
   group.add(beam, light);
-  group.userData = { a, b, phase, speed, beam, light };
+  group.userData = { name, a, b, phase, speed, beam, light };
   beams.push(group);
   root.add(group);
 }
