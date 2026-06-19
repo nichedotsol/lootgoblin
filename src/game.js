@@ -41,6 +41,66 @@ camera.lookAt(0, 0, 0.45);
 const root = new THREE.Group();
 scene.add(root);
 
+const textureLoader = new THREE.TextureLoader();
+const spriteTextures = {};
+const spriteFiles = {
+  goblinIdle: "goblin_idle.png",
+  goblinWalkA: "goblin_walk_a.png",
+  goblinWalkB: "goblin_walk_b.png",
+  goblinDash: "goblin_dash.png",
+  terminalMain: "terminal_main.png",
+  terminalQuestion: "terminal_question.png",
+  crystalObelisk: "crystal_obelisk.png",
+  amberShrine: "amber_shrine.png",
+  auditEmitter: "audit_emitter.png",
+  signDepth: "sign_depth.png",
+  signDanger: "sign_danger.png",
+  greenCrystal: "green_crystal.png",
+  mushrooms: "mushrooms.png",
+  grassTuft: "grass_tuft.png",
+  leafCluster: "leaf_cluster.png",
+  wallShards: "wall_shards.png",
+  computeToken: "compute_token.png",
+  auditBeam: "audit_beam.png",
+  mossTile: "moss_tile.png",
+  stoneTile: "stone_tile.png",
+  runePlatform: "rune_platform.png",
+  caveWallStrip: "cave_wall_strip.png",
+};
+
+const spriteAspect = {
+  goblinIdle: 378 / 505,
+  goblinWalkA: 384 / 491,
+  goblinWalkB: 505 / 495,
+  goblinDash: 448 / 397,
+  terminalMain: 356 / 346,
+  terminalQuestion: 344 / 305,
+  crystalObelisk: 321 / 330,
+  amberShrine: 336 / 312,
+  auditEmitter: 336 / 341,
+  signDepth: 237 / 356,
+  signDanger: 222 / 362,
+  greenCrystal: 252 / 352,
+  mushrooms: 237 / 253,
+  grassTuft: 218 / 245,
+  leafCluster: 260 / 295,
+  wallShards: 304 / 284,
+  computeToken: 337 / 350,
+  auditBeam: 367 / 345,
+  mossTile: 386 / 329,
+  stoneTile: 377 / 320,
+  runePlatform: 392 / 305,
+  caveWallStrip: 369 / 363,
+};
+
+for (const [key, file] of Object.entries(spriteFiles)) {
+  const texture = textureLoader.load(`./assets/sprites/${file}`);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  spriteTextures[key] = texture;
+}
+
 scene.add(new THREE.HemisphereLight(0x9aff9b, 0x06110a, 2.8));
 
 const keyLight = new THREE.DirectionalLight(0xb7ff9d, 3.1);
@@ -76,6 +136,69 @@ const shared = {
   wood: new THREE.MeshStandardMaterial({ color: colors.wood, roughness: 0.82 }),
 };
 
+function makeSprite(textureKey, height, position, options = {}) {
+  const texture = spriteTextures[textureKey];
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false,
+    alphaTest: 0.03,
+    color: options.color ?? 0xffffff,
+  });
+  const sprite = new THREE.Sprite(material);
+  const aspect = options.aspect ?? spriteAspect[textureKey] ?? 1;
+  sprite.scale.set(height * aspect, height, 1);
+  sprite.position.copy(position);
+  sprite.renderOrder = options.renderOrder ?? Math.round(position.z * 10 + position.y * 100);
+  sprite.userData.textureKey = textureKey;
+  return sprite;
+}
+
+function setSpriteTexture(sprite, textureKey) {
+  if (!sprite || sprite.userData.textureKey === textureKey) return;
+  const height = sprite.scale.y;
+  const facing = Math.sign(sprite.scale.x || 1);
+  sprite.material.map = spriteTextures[textureKey];
+  sprite.material.needsUpdate = true;
+  sprite.scale.x = height * (spriteAspect[textureKey] ?? 1) * facing;
+  sprite.userData.textureKey = textureKey;
+}
+
+function addPaintedGroundDecal(textureKey, x, z, width, rotation = 0, opacity = 0.9) {
+  const aspect = spriteAspect[textureKey] ?? 1;
+  const material = new THREE.MeshBasicMaterial({
+    map: spriteTextures[textureKey],
+    transparent: true,
+    alphaTest: 0.03,
+    opacity,
+    depthWrite: false,
+  });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width / aspect), material);
+  mesh.position.set(x, 0.062, z);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.rotation.z = rotation;
+  mesh.renderOrder = 5;
+  root.add(mesh);
+}
+
+function addWallSprite(textureKey, x, z, height, y = 0.92) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.add(makeSprite(textureKey, height, new THREE.Vector3(0, y, 0), { renderOrder: 35 }));
+  root.add(group);
+}
+
+function addSpriteShadow(group, width, depth) {
+  const shadow = new THREE.Mesh(
+    new THREE.CircleGeometry(0.5, 28),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false })
+  );
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.scale.set(width, depth, 1);
+  shadow.position.y = 0.025;
+  group.add(shadow);
+}
+
 const state = {
   score: 0,
   collected: 0,
@@ -86,6 +209,7 @@ const state = {
 
 const player = {
   group: new THREE.Group(),
+  sprite: null,
   facing: 1,
   dashCooldown: 0,
   invulnerable: 0,
@@ -203,7 +327,9 @@ function setupWorld() {
 
   for (let i = 0; i < 170; i += 1) addSlab(i);
   for (let i = 0; i < 95; i += 1) addMoss(i);
+  for (let i = 0; i < 42; i += 1) addPaintedFloorPatch(i);
   for (let i = 0; i < 38; i += 1) addBackWallShard(i);
+  for (let i = 0; i < 18; i += 1) addPaintedWallPatch(i);
 
   RUIN_ARTIFACTS.forEach(spawnRuinArtifact);
   COMPUTE_TOKEN_ARTIFACTS.forEach((artifact, index) => addToken(artifact, index));
@@ -280,6 +406,17 @@ function addMoss(i) {
   root.add(moss);
 }
 
+function addPaintedFloorPatch(i) {
+  const textureKey = i % 11 === 0 ? "runePlatform" : i % 3 === 0 ? "mossTile" : "stoneTile";
+  const angle = (i * 2.147) % (Math.PI * 2);
+  const radius = 1.4 + ((i * 43) % 100) / 100 * 8.2;
+  const x = Math.cos(angle) * radius * 1.08;
+  const z = Math.sin(angle) * radius * 0.58;
+  if ((x / 10.2) ** 2 + (z / 5.4) ** 2 > 1) return;
+  const width = textureKey === "runePlatform" ? 1.9 : 0.9 + (i % 5) * 0.18;
+  addPaintedGroundDecal(textureKey, x, z, width, angle + i * 0.19, textureKey === "mossTile" ? 0.72 : 0.9);
+}
+
 function addBackWallShard(i) {
   const x = -11.2 + i * 0.62;
   const z = -5.65 + ((i * 19) % 20) * 0.055;
@@ -288,17 +425,22 @@ function addBackWallShard(i) {
   root.add(shard);
 }
 
+function addPaintedWallPatch(i) {
+  const textureKey = i % 4 === 0 ? "caveWallStrip" : "wallShards";
+  const side = i % 3;
+  const x = side === 0 ? -10.4 + i * 1.1 : side === 1 ? 10.1 - i * 0.72 : -9.4 + i * 1.05;
+  const z = side === 2 ? -5.45 : -5.1 + (i % 6) * 0.38;
+  const height = textureKey === "caveWallStrip" ? 2.15 + (i % 4) * 0.22 : 1.38 + (i % 3) * 0.25;
+  addWallSprite(textureKey, x, z, height, height * 0.48);
+}
+
 function addTerminal({ x, z, scale, rotation, lines }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
-  group.rotation.y = rotation;
   group.scale.setScalar(scale);
-  group.add(makeBox(1.6, 1.65, 0.42, shared.terminalSide, new THREE.Vector3(0, 0.82, 0)));
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(1.12, 0.92), addTextPanel(lines));
-  face.position.set(0, 0.98, 0.23);
-  group.add(face);
-  group.add(makeBox(1.42, 0.2, 0.55, shared.wood, new THREE.Vector3(0, 0.12, 0.08)));
-  for (let i = 0; i < 4; i += 1) group.add(makeBox(0.15, 0.08, 0.08, shared.amber, new THREE.Vector3(-0.48 + i * 0.32, 0.32, 0.28)));
+  addSpriteShadow(group, 1.25, 0.62);
+  const key = lines.some((line) => line.includes("?")) ? "terminalQuestion" : "terminalMain";
+  group.add(makeSprite(key, key === "terminalMain" ? 2.9 : 2.65, new THREE.Vector3(0, 1.42, 0), { renderOrder: 50 }));
   root.add(group);
 }
 
@@ -306,18 +448,8 @@ function addObelisk({ x, z, scale }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
-  const crystal = new THREE.Mesh(new THREE.ConeGeometry(0.58, 2.3, 5), new THREE.MeshStandardMaterial({
-    color: colors.cyan,
-    emissive: colors.cyan,
-    emissiveIntensity: 1.3,
-    transparent: true,
-    opacity: 0.56,
-    roughness: 0.12,
-  }));
-  crystal.position.y = 1.55;
-  crystal.castShadow = true;
-  group.add(crystal);
-  group.add(makeBox(1.8, 0.32, 1.2, shared.darkStone, new THREE.Vector3(0, 0.16, 0)));
+  addSpriteShadow(group, 1.15, 0.62);
+  group.add(makeSprite("crystalObelisk", 3.1, new THREE.Vector3(0, 1.55, 0), { renderOrder: 65 }));
   group.add(new THREE.PointLight(colors.cyan, 8, 7));
   root.add(group);
 }
@@ -326,9 +458,8 @@ function addShrine({ x, z, scale }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
-  group.add(makeBox(1.5, 1.1, 1.35, shared.darkStone, new THREE.Vector3(0, 0.55, 0)));
-  group.add(makeBox(1.15, 0.32, 1.1, shared.stone, new THREE.Vector3(0, 1.25, 0)));
-  group.add(makeBox(0.24, 0.55, 0.08, shared.amber, new THREE.Vector3(0, 0.75, 0.7)));
+  addSpriteShadow(group, 1.0, 0.58);
+  group.add(makeSprite("amberShrine", 2.35, new THREE.Vector3(0, 1.12, 0), { renderOrder: 62 }));
   const light = new THREE.PointLight(colors.amber, 5, 5);
   light.position.set(0, 1.0, 0.6);
   group.add(light);
@@ -339,8 +470,8 @@ function addDataNode({ x, z, scale }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
-  group.add(makeBox(0.75, 0.45, 0.55, shared.darkStone, new THREE.Vector3(0, 0.35, 0)));
-  group.add(makeBox(0.38, 0.06, 0.08, shared.cyan, new THREE.Vector3(0, 0.64, 0.28)));
+  addSpriteShadow(group, 0.44, 0.22);
+  group.add(makeSprite("stoneTile", 0.65, new THREE.Vector3(0, 0.36, 0), { renderOrder: 46 }));
   group.add(new THREE.PointLight(colors.cyan, 3.5, 4));
   root.add(group);
 }
@@ -349,8 +480,8 @@ function addBeamMachine({ x, z, scale }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
-  group.add(makeBox(1.25, 0.75, 1.05, shared.terminal, new THREE.Vector3(0, 0.38, 0)));
-  group.add(makeBox(0.8, 0.18, 0.08, shared.amber, new THREE.Vector3(0, 0.75, 0.56)));
+  addSpriteShadow(group, 0.74, 0.42);
+  group.add(makeSprite("auditEmitter", 1.65, new THREE.Vector3(0, 0.82, 0), { renderOrder: 58 }));
   root.add(group);
 }
 
@@ -358,20 +489,16 @@ function addCrate({ x, z, scale }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
-  group.add(makeBox(1.15, 0.7, 0.85, shared.wood, new THREE.Vector3(0, 0.35, 0)));
-  group.add(makeBox(0.68, 0.08, 0.11, shared.amber, new THREE.Vector3(0, 0.72, 0)));
+  addSpriteShadow(group, 0.42, 0.28);
+  group.add(makeSprite("stoneTile", 0.72, new THREE.Vector3(0, 0.38, 0), { renderOrder: 47 }));
   root.add(group);
 }
 
 function addSign({ x, z, label, danger }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
-  group.rotation.y = x < 0 ? -0.18 : 0.18;
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.34), addTextPanel([label], 380, 140));
-  face.position.set(0, 0.86, 0.056);
-  group.add(makeBox(0.12, 0.7, 0.12, shared.wood, new THREE.Vector3(0, 0.3, 0)));
-  group.add(makeBox(1.15, 0.46, 0.1, danger ? shared.red : shared.wood, new THREE.Vector3(0, 0.86, 0)));
-  group.add(face);
+  addSpriteShadow(group, 0.62, 0.25);
+  group.add(makeSprite(danger ? "signDanger" : "signDepth", 1.28, new THREE.Vector3(0, 0.7, 0), { renderOrder: 57 }));
   root.add(group);
 }
 
@@ -379,9 +506,8 @@ function addCrystal({ x, z, scale }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
-  const crystal = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.35, 5), shared.green);
-  crystal.position.y = 0.74;
-  group.add(crystal);
+  addSpriteShadow(group, 0.6, 0.34);
+  group.add(makeSprite("greenCrystal", 1.55, new THREE.Vector3(0, 0.78, 0), { renderOrder: 56 }));
   const light = new THREE.PointLight(colors.green, 4.5, 4.5);
   light.position.y = 0.9;
   group.add(light);
@@ -392,13 +518,7 @@ function addPlant({ x, z, scale }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
-  for (let i = 0; i < 8; i += 1) {
-    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.85, 4), shared.green);
-    leaf.position.y = 0.32;
-    leaf.rotation.z = -0.8 + i * 0.22;
-    leaf.rotation.y = i * 0.7;
-    group.add(leaf);
-  }
+  group.add(makeSprite("grassTuft", 0.95, new THREE.Vector3(0, 0.48, 0), { renderOrder: 52 }));
   root.add(group);
 }
 
@@ -406,24 +526,16 @@ function addMushrooms({ x, z, scale }) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   group.scale.setScalar(scale);
-  for (let i = 0; i < 3; i += 1) {
-    const stem = makeCylinder(0.06, 0.08, 0.35, 8, new THREE.MeshStandardMaterial({ color: 0xd9c46b }), new THREE.Vector3(-0.28 + i * 0.28, 0.17, 0));
-    const cap = makeCylinder(0.24, 0.08, 0.18, 12, new THREE.MeshStandardMaterial({ color: 0x8b3b26 }), new THREE.Vector3(-0.28 + i * 0.28, 0.42, 0));
-    group.add(stem, cap);
-  }
+  group.add(makeSprite("mushrooms", 1.1, new THREE.Vector3(0, 0.54, 0), { renderOrder: 52 }));
   root.add(group);
 }
 
 function addToken({ name, x, z }, index) {
   const group = new THREE.Group();
   group.position.set(x, 0.78, z);
-  const token = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.12, 6), shared.token);
-  token.rotation.x = Math.PI / 2;
-  const inner = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.14, 6), shared.token);
-  inner.rotation.x = Math.PI / 2;
-  inner.scale.set(0.7, 0.7, 1);
+  const token = makeSprite("computeToken", 0.92, new THREE.Vector3(0, 0, 0), { renderOrder: 80 });
   const light = new THREE.PointLight(colors.cyan, 5.6, 4);
-  group.add(token, inner, light);
+  group.add(token, light);
   group.userData = { name, index, taken: false, baseY: 0.78, pulse: Math.random() * Math.PI * 2 };
   tokens.push(group);
   root.add(group);
@@ -435,13 +547,16 @@ function addAuditBeam({ name, x1, z1, x2, z2, phase, speed }) {
   const b = new THREE.Vector3(x2, 0.58, z2);
   const mid = a.clone().add(b).multiplyScalar(0.5);
   const length = a.distanceTo(b);
-  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, length, 10), new THREE.MeshBasicMaterial({ color: colors.amber }));
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, length, 10), new THREE.MeshBasicMaterial({ color: colors.amber }));
   beam.position.copy(mid);
   beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+  const beamArt = makeSprite("auditBeam", 1.25, mid.clone().add(new THREE.Vector3(0, 0.1, 0)), { renderOrder: 76 });
+  beamArt.scale.x = length * 0.62;
+  beamArt.scale.y = 1.2;
   const light = new THREE.PointLight(colors.amber, 3.8, 6);
   light.position.copy(mid);
-  group.add(beam, light);
-  group.userData = { name, a, b, phase, speed, beam, light };
+  group.add(beam, beamArt, light);
+  group.userData = { name, a, b, phase, speed, beam, beamArt, light };
   beams.push(group);
   root.add(group);
 }
@@ -450,21 +565,11 @@ function buildPlayer() {
   player.group.clear();
   player.group.position.set(0, 0, 1.1);
   player.facing = 1;
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.55, 4, 10), new THREE.MeshStandardMaterial({ color: 0x27642c, roughness: 0.8 }));
-  body.position.y = 0.78;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12), shared.green);
-  head.position.set(0, 1.42, 0);
-  head.scale.set(1.1, 0.78, 0.9);
-  const earL = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.58, 4), shared.green);
-  earL.position.set(-0.43, 1.45, 0);
-  earL.rotation.z = Math.PI / 2;
-  const earR = earL.clone();
-  earR.position.x = 0.43;
-  earR.rotation.z = -Math.PI / 2;
-  const pack = makeBox(0.34, 0.58, 0.22, new THREE.MeshStandardMaterial({ color: 0x9b3226, roughness: 0.65 }), new THREE.Vector3(-0.36, 0.72, 0.07));
-  const bootL = makeBox(0.28, 0.15, 0.48, new THREE.MeshStandardMaterial({ color: 0x8d4d25, roughness: 0.88 }), new THREE.Vector3(-0.18, 0.08, 0.16));
-  const bootR = makeBox(0.28, 0.15, 0.48, new THREE.MeshStandardMaterial({ color: 0x8d4d25, roughness: 0.88 }), new THREE.Vector3(0.18, 0.08, 0.16));
-  player.group.add(body, head, earL, earR, pack, bootL, bootR);
+  addSpriteShadow(player.group, 0.5, 0.26);
+  const sprite = makeSprite("goblinIdle", 1.75, new THREE.Vector3(0, 0.92, 0), { renderOrder: 90 });
+  sprite.name = "goblinSprite";
+  player.sprite = sprite;
+  player.group.add(sprite);
 }
 
 function resetGame() {
@@ -474,6 +579,7 @@ function resetGame() {
   state.status = "playing";
   state.startedAt = performance.now();
   player.group.position.set(0, 0, 1.1);
+  player.group.scale.set(1, 1, 1);
   player.dashCooldown = 0;
   player.invulnerable = 0;
   tokens.forEach((token) => {
@@ -533,6 +639,7 @@ function update(delta) {
     player.facing = Math.sign(mx);
     player.group.scale.x = player.facing;
   }
+  updatePlayerSprite(Boolean(mx || mz), dashing);
 
   updateTokens(delta);
   updateBeams();
@@ -540,6 +647,19 @@ function update(delta) {
 
   if (performance.now() - state.startedAt > 5600) toast.classList.add("is-quiet");
   updateHud();
+}
+
+function updatePlayerSprite(moving, dashing) {
+  if (!player.sprite) return;
+  const key = dashing
+    ? "goblinDash"
+    : moving
+      ? Math.floor(performance.now() / 170) % 2
+        ? "goblinWalkA"
+        : "goblinWalkB"
+      : "goblinIdle";
+  setSpriteTexture(player.sprite, key);
+  player.sprite.position.y = 0.92 + (moving ? Math.sin(performance.now() / 95) * 0.035 : Math.sin(performance.now() / 340) * 0.018);
 }
 
 function updateTokens(delta) {
@@ -566,9 +686,11 @@ function updateTokens(delta) {
 function updateBeams() {
   const now = performance.now() / 1000;
   beams.forEach((group) => {
-    const { a, b, phase, speed, beam, light } = group.userData;
+    const { a, b, phase, speed, beam, beamArt, light } = group.userData;
     const active = Math.sin(now * speed + phase) > -0.18;
     beam.visible = active;
+    beamArt.visible = active;
+    beamArt.material.opacity = active ? 0.82 + Math.sin(now * 12 + phase) * 0.14 : 0;
     light.visible = active;
     if (!active || player.invulnerable > 0) return;
     if (distanceToSegment(player.group.position, a, b) < 0.52) {
