@@ -1,76 +1,440 @@
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js";
+
 const canvas = document.querySelector("#game");
-const ctx = canvas.getContext("2d");
 const tokenCount = document.querySelector("#token-count");
 const scoreReadout = document.querySelector("#score");
 const timerReadout = document.querySelector("#timer");
 const toast = document.querySelector("#toast");
 const restart = document.querySelector("#restart");
 
-const world = {
-  width: 1280,
-  height: 720,
-  bounds: { x: 72, y: 78, width: 1136, height: 548 },
+const totalTokens = 15;
+const keys = new Set();
+const clock = new THREE.Clock();
+const worldBounds = { minX: -11, maxX: 11, minZ: -5.7, maxZ: 5.7 };
+
+const colors = {
+  bg: 0x020604,
+  floor: 0x143018,
+  moss: 0x2f7b25,
+  stone: 0x5f695d,
+  darkStone: 0x1e2924,
+  green: 0x75ff66,
+  cyan: 0x35f5ff,
+  amber: 0xffba3b,
+  red: 0xff583f,
+  wood: 0x5a351b,
 };
 
-const keys = new Set();
-const totalTokens = 15;
-let state;
-let lastFrame = performance.now();
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+renderer.setClearColor(colors.bg);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(colors.bg);
+scene.fog = new THREE.FogExp2(0x07120a, 0.035);
+
+const camera = new THREE.OrthographicCamera(-12, 12, 7, -7, 0.1, 100);
+camera.position.set(8.5, 8.5, 10.5);
+camera.lookAt(0, 0, 0.45);
+
+const root = new THREE.Group();
+scene.add(root);
+
+scene.add(new THREE.HemisphereLight(0x9aff9b, 0x06110a, 2.8));
+
+const keyLight = new THREE.DirectionalLight(0xb7ff9d, 3.1);
+keyLight.position.set(-5, 12, 8);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.left = -14;
+keyLight.shadow.camera.right = 14;
+keyLight.shadow.camera.top = 10;
+keyLight.shadow.camera.bottom = -10;
+scene.add(keyLight);
+
+const cyanLight = new THREE.PointLight(colors.cyan, 8, 16);
+cyanLight.position.set(-3.5, 4, -3.5);
+scene.add(cyanLight);
+
+const amberLight = new THREE.PointLight(colors.amber, 6, 13);
+amberLight.position.set(7.5, 3.8, 3);
+scene.add(amberLight);
+
+const shared = {
+  floor: new THREE.MeshStandardMaterial({ color: colors.floor, roughness: 0.92, metalness: 0.03 }),
+  moss: new THREE.MeshStandardMaterial({ color: colors.moss, roughness: 0.95 }),
+  stone: new THREE.MeshStandardMaterial({ color: colors.stone, roughness: 0.86 }),
+  darkStone: new THREE.MeshStandardMaterial({ color: colors.darkStone, roughness: 0.9 }),
+  terminal: new THREE.MeshStandardMaterial({ color: 0x111915, roughness: 0.78, metalness: 0.08 }),
+  terminalSide: new THREE.MeshStandardMaterial({ color: 0x29332d, roughness: 0.72, metalness: 0.12 }),
+  green: new THREE.MeshStandardMaterial({ color: colors.green, emissive: 0x1f7a20, emissiveIntensity: 0.3, roughness: 0.7 }),
+  amber: new THREE.MeshStandardMaterial({ color: colors.amber, emissive: colors.amber, emissiveIntensity: 0.75, roughness: 0.45 }),
+  cyan: new THREE.MeshStandardMaterial({ color: colors.cyan, emissive: colors.cyan, emissiveIntensity: 1.5, roughness: 0.28 }),
+  token: new THREE.MeshStandardMaterial({ color: colors.cyan, emissive: colors.cyan, emissiveIntensity: 2.6, roughness: 0.18, metalness: 0.22 }),
+  red: new THREE.MeshStandardMaterial({ color: colors.red, emissive: colors.red, emissiveIntensity: 1.2 }),
+  wood: new THREE.MeshStandardMaterial({ color: colors.wood, roughness: 0.82 }),
+};
+
+const state = {
+  score: 0,
+  collected: 0,
+  timeLeft: 105,
+  status: "playing",
+  startedAt: performance.now(),
+};
+
+const player = {
+  group: new THREE.Group(),
+  facing: 1,
+  dashCooldown: 0,
+  invulnerable: 0,
+};
 
 const tokenSeeds = [
-  [260, 474],
-  [352, 290],
-  [476, 390],
-  [574, 584],
-  [650, 230],
-  [738, 510],
-  [842, 344],
-  [934, 580],
-  [1010, 242],
-  [1064, 436],
-  [218, 336],
-  [766, 176],
-  [602, 168],
-  [1038, 330],
-  [434, 548],
+  [-7.5, 3.1],
+  [-5.8, -1.6],
+  [-3.5, 1.8],
+  [-1.1, 4.4],
+  [0.0, -3.4],
+  [2.0, 2.6],
+  [3.9, -0.6],
+  [5.4, 4.0],
+  [6.7, -3.1],
+  [8.2, 1.7],
+  [-8.7, -0.5],
+  [1.7, -4.2],
+  [-1.0, -4.7],
+  [7.9, -0.7],
+  [-4.2, 4.3],
 ];
 
-const props = [
-  { type: "terminal", x: 172, y: 244, scale: 1.42, label: "SYS OK", side: "left" },
-  { type: "terminal", x: 1078, y: 235, scale: 1.22, label: "?", side: "right" },
-  { type: "obelisk", x: 548, y: 168, scale: 1.22 },
-  { type: "shrine", x: 835, y: 174, scale: 1.08 },
-  { type: "node", x: 650, y: 196, scale: 0.9 },
-  { type: "crate", x: 905, y: 552, scale: 1 },
-  { type: "crate", x: 1012, y: 402, scale: 0.86 },
-  { type: "sign", x: 135, y: 535, scale: 1, label: "D3PTH ->" },
-  { type: "sign", x: 1140, y: 545, scale: 1, label: "DANGER" },
-  { type: "crystal", x: 414, y: 592, scale: 1 },
-  { type: "crystal", x: 1118, y: 430, scale: 0.82 },
-  { type: "crystal", x: 962, y: 634, scale: 1.2 },
-  { type: "mushrooms", x: 82, y: 510, scale: 1 },
-  { type: "plant", x: 176, y: 606, scale: 0.9 },
-  { type: "plant", x: 1018, y: 640, scale: 1.05 },
-];
+const tokens = [];
+const beams = [];
+const particles = [];
 
-const beams = [
-  { x1: 890, y1: 500, x2: 1080, y2: 370, phase: 0, speed: 1.16 },
-  { x1: 258, y1: 214, x2: 464, y2: 282, phase: 1.7, speed: 1.04 },
-  { x1: 584, y1: 622, x2: 744, y2: 462, phase: 2.6, speed: 0.92 },
-];
+function makeBox(width, height, depth, material, position, rotationY = 0) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+  mesh.position.copy(position);
+  mesh.rotation.y = rotationY;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+function makeCylinder(radiusTop, radiusBottom, height, sides, material, position) {
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, height, sides), material);
+  mesh.position.copy(position);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+function addTextPanel(textLines, width = 512, height = 384) {
+  const textureCanvas = document.createElement("canvas");
+  textureCanvas.width = width;
+  textureCanvas.height = height;
+  const ctx = textureCanvas.getContext("2d");
+  ctx.fillStyle = "#06120b";
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = "#75ff66";
+  ctx.shadowColor = "#75ff66";
+  ctx.shadowBlur = 8;
+  ctx.font = "34px Courier New";
+  textLines.forEach((line, index) => ctx.fillText(line, 42, 72 + index * 49));
+  const texture = new THREE.CanvasTexture(textureCanvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.MeshBasicMaterial({ map: texture });
+}
+
+function setupWorld() {
+  root.clear();
+  tokens.length = 0;
+  beams.length = 0;
+  particles.length = 0;
+
+  const floor = new THREE.Mesh(new THREE.CylinderGeometry(9.8, 10.6, 0.32, 96), shared.floor);
+  floor.scale.z = 0.56;
+  floor.position.y = -0.18;
+  floor.receiveShadow = true;
+  root.add(floor);
+
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(5.05, 0.08, 12, 120), shared.stone);
+  rim.position.set(0, 0.02, 0);
+  rim.rotation.x = Math.PI / 2;
+  rim.scale.z = 0.62;
+  root.add(rim);
+
+  for (let i = 0; i < 5; i += 1) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.85 + i * 0.55, 0.055, 10, 80), i % 2 ? shared.darkStone : shared.stone);
+    ring.position.set(0.45, 0.03 + i * 0.008, -0.25);
+    ring.rotation.x = Math.PI / 2;
+    ring.scale.z = 0.62;
+    ring.receiveShadow = true;
+    root.add(ring);
+  }
+
+  for (let i = 0; i < 170; i += 1) addSlab(i);
+  for (let i = 0; i < 95; i += 1) addMoss(i);
+  for (let i = 0; i < 38; i += 1) addBackWallShard(i);
+
+  addTerminal(-8.3, -1.8, 1.25, -0.23, ["> SYS.OK", "> GRID.ONLINE", "> NODES: 42", "> PACKETS: 1203", ">_"]);
+  addTerminal(8.0, -1.7, 1.1, 0.18, ["", "     ?", "", "----"]);
+  addObelisk(-2.4, -3.6, 1.05);
+  addShrine(4.5, -3.2, 1);
+  addDataNode(-0.35, -3.35, 0.9);
+  addBeamMachine(5.8, 3.5, 0.9);
+  addBeamMachine(8.3, 0.6, 0.75);
+  addCrate(2.3, 2.2, 0.76);
+  addCrate(-3.2, 0.4, 0.62);
+  addSign(-8.8, 3.6, "D3PTH ->", false);
+  addSign(8.9, 3.6, "DANGER", true);
+  addCrystal(8.5, 1.8, 1.1);
+  addCrystal(5.6, 5.0, 1.25);
+  addPlant(-8.0, 5.0, 0.85);
+  addPlant(7.0, 5.0, 0.8);
+  addMushrooms(-9.6, 2.5, 0.9);
+
+  tokenSeeds.forEach(([x, z], index) => addToken(x, z, index));
+  addAuditBeam(-6.0, -0.6, -2.9, -2.2, 1.7, 1.04);
+  addAuditBeam(4.3, 4.1, 8.1, 1.1, 0.1, 1.18);
+  addAuditBeam(-0.6, 4.7, 2.2, 1.6, 2.5, 0.95);
+
+  buildPlayer();
+  root.add(player.group);
+}
+
+function addSlab(i) {
+  const angle = (i * 137.5 * Math.PI) / 180;
+  const radius = 0.55 + (i % 17) * 0.51;
+  const x = Math.cos(angle) * radius * 1.15;
+  const z = Math.sin(angle) * radius * 0.82;
+  if ((x / 10.1) ** 2 + (z / 5.7) ** 2 > 1) return;
+  const slab = makeBox(
+    0.42 + (i % 5) * 0.1,
+    0.08,
+    0.22 + (i % 4) * 0.06,
+    i % 6 === 0 ? shared.darkStone : shared.stone,
+    new THREE.Vector3(x, 0.04, z),
+    (i % 8) * 0.34
+  );
+  root.add(slab);
+}
+
+function addMoss(i) {
+  const angle = (i * 2.399963) % (Math.PI * 2);
+  const radius = Math.sqrt((i * 37) % 1000) / Math.sqrt(1000);
+  const x = Math.cos(angle) * 9.2 * radius;
+  const z = Math.sin(angle) * 5.2 * radius;
+  const moss = new THREE.Mesh(new THREE.CircleGeometry(0.22 + (i % 5) * 0.07, 12), shared.moss);
+  moss.position.set(x, 0.055, z);
+  moss.rotation.x = -Math.PI / 2;
+  moss.rotation.z = i * 0.31;
+  moss.scale.z = 0.44 + (i % 4) * 0.08;
+  root.add(moss);
+}
+
+function addBackWallShard(i) {
+  const x = -11.2 + i * 0.62;
+  const z = -5.65 + ((i * 19) % 20) * 0.055;
+  const shard = makeBox(0.22 + (i % 3) * 0.08, 1.2 + (i % 5) * 0.34, 0.18, shared.darkStone, new THREE.Vector3(x, 0.45, z), (i % 7) * 0.11);
+  shard.rotation.z = -0.2 + (i % 4) * 0.14;
+  root.add(shard);
+}
+
+function addTerminal(x, z, scale, rotation, lines) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = rotation;
+  group.scale.setScalar(scale);
+  group.add(makeBox(1.6, 1.65, 0.42, shared.terminalSide, new THREE.Vector3(0, 0.82, 0)));
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(1.12, 0.92), addTextPanel(lines));
+  face.position.set(0, 0.98, 0.23);
+  group.add(face);
+  group.add(makeBox(1.42, 0.2, 0.55, shared.wood, new THREE.Vector3(0, 0.12, 0.08)));
+  for (let i = 0; i < 4; i += 1) group.add(makeBox(0.15, 0.08, 0.08, shared.amber, new THREE.Vector3(-0.48 + i * 0.32, 0.32, 0.28)));
+  root.add(group);
+}
+
+function addObelisk(x, z, scale) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.scale.setScalar(scale);
+  const crystal = new THREE.Mesh(new THREE.ConeGeometry(0.58, 2.3, 5), new THREE.MeshStandardMaterial({
+    color: colors.cyan,
+    emissive: colors.cyan,
+    emissiveIntensity: 1.3,
+    transparent: true,
+    opacity: 0.56,
+    roughness: 0.12,
+  }));
+  crystal.position.y = 1.55;
+  crystal.castShadow = true;
+  group.add(crystal);
+  group.add(makeBox(1.8, 0.32, 1.2, shared.darkStone, new THREE.Vector3(0, 0.16, 0)));
+  group.add(new THREE.PointLight(colors.cyan, 8, 7));
+  root.add(group);
+}
+
+function addShrine(x, z, scale) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.scale.setScalar(scale);
+  group.add(makeBox(1.5, 1.1, 1.35, shared.darkStone, new THREE.Vector3(0, 0.55, 0)));
+  group.add(makeBox(1.15, 0.32, 1.1, shared.stone, new THREE.Vector3(0, 1.25, 0)));
+  group.add(makeBox(0.24, 0.55, 0.08, shared.amber, new THREE.Vector3(0, 0.75, 0.7)));
+  const light = new THREE.PointLight(colors.amber, 5, 5);
+  light.position.set(0, 1.0, 0.6);
+  group.add(light);
+  root.add(group);
+}
+
+function addDataNode(x, z, scale) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.scale.setScalar(scale);
+  group.add(makeBox(0.75, 0.45, 0.55, shared.darkStone, new THREE.Vector3(0, 0.35, 0)));
+  group.add(makeBox(0.38, 0.06, 0.08, shared.cyan, new THREE.Vector3(0, 0.64, 0.28)));
+  group.add(new THREE.PointLight(colors.cyan, 3.5, 4));
+  root.add(group);
+}
+
+function addBeamMachine(x, z, scale) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.scale.setScalar(scale);
+  group.add(makeBox(1.25, 0.75, 1.05, shared.terminal, new THREE.Vector3(0, 0.38, 0)));
+  group.add(makeBox(0.8, 0.18, 0.08, shared.amber, new THREE.Vector3(0, 0.75, 0.56)));
+  root.add(group);
+}
+
+function addCrate(x, z, scale) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.scale.setScalar(scale);
+  group.add(makeBox(1.15, 0.7, 0.85, shared.wood, new THREE.Vector3(0, 0.35, 0)));
+  group.add(makeBox(0.68, 0.08, 0.11, shared.amber, new THREE.Vector3(0, 0.72, 0)));
+  root.add(group);
+}
+
+function addSign(x, z, label, danger) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = x < 0 ? -0.18 : 0.18;
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.34), addTextPanel([label], 380, 140));
+  face.position.set(0, 0.86, 0.056);
+  group.add(makeBox(0.12, 0.7, 0.12, shared.wood, new THREE.Vector3(0, 0.3, 0)));
+  group.add(makeBox(1.15, 0.46, 0.1, danger ? shared.red : shared.wood, new THREE.Vector3(0, 0.86, 0)));
+  group.add(face);
+  root.add(group);
+}
+
+function addCrystal(x, z, scale) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.scale.setScalar(scale);
+  const crystal = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.35, 5), shared.green);
+  crystal.position.y = 0.74;
+  group.add(crystal);
+  const light = new THREE.PointLight(colors.green, 4.5, 4.5);
+  light.position.y = 0.9;
+  group.add(light);
+  root.add(group);
+}
+
+function addPlant(x, z, scale) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.scale.setScalar(scale);
+  for (let i = 0; i < 8; i += 1) {
+    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.85, 4), shared.green);
+    leaf.position.y = 0.32;
+    leaf.rotation.z = -0.8 + i * 0.22;
+    leaf.rotation.y = i * 0.7;
+    group.add(leaf);
+  }
+  root.add(group);
+}
+
+function addMushrooms(x, z, scale) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.scale.setScalar(scale);
+  for (let i = 0; i < 3; i += 1) {
+    const stem = makeCylinder(0.06, 0.08, 0.35, 8, new THREE.MeshStandardMaterial({ color: 0xd9c46b }), new THREE.Vector3(-0.28 + i * 0.28, 0.17, 0));
+    const cap = makeCylinder(0.24, 0.08, 0.18, 12, new THREE.MeshStandardMaterial({ color: 0x8b3b26 }), new THREE.Vector3(-0.28 + i * 0.28, 0.42, 0));
+    group.add(stem, cap);
+  }
+  root.add(group);
+}
+
+function addToken(x, z, index) {
+  const group = new THREE.Group();
+  group.position.set(x, 0.78, z);
+  const token = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.12, 6), shared.token);
+  token.rotation.x = Math.PI / 2;
+  const inner = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.14, 6), shared.token);
+  inner.rotation.x = Math.PI / 2;
+  inner.scale.set(0.7, 0.7, 1);
+  const light = new THREE.PointLight(colors.cyan, 5.6, 4);
+  group.add(token, inner, light);
+  group.userData = { index, taken: false, baseY: 0.78, pulse: Math.random() * Math.PI * 2 };
+  tokens.push(group);
+  root.add(group);
+}
+
+function addAuditBeam(x1, z1, x2, z2, phase, speed) {
+  const group = new THREE.Group();
+  const a = new THREE.Vector3(x1, 0.58, z1);
+  const b = new THREE.Vector3(x2, 0.58, z2);
+  const mid = a.clone().add(b).multiplyScalar(0.5);
+  const length = a.distanceTo(b);
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, length, 10), new THREE.MeshBasicMaterial({ color: colors.amber }));
+  beam.position.copy(mid);
+  beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+  const light = new THREE.PointLight(colors.amber, 3.8, 6);
+  light.position.copy(mid);
+  group.add(beam, light);
+  group.userData = { a, b, phase, speed, beam, light };
+  beams.push(group);
+  root.add(group);
+}
+
+function buildPlayer() {
+  player.group.clear();
+  player.group.position.set(0, 0, 1.1);
+  player.facing = 1;
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.55, 4, 10), new THREE.MeshStandardMaterial({ color: 0x27642c, roughness: 0.8 }));
+  body.position.y = 0.78;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12), shared.green);
+  head.position.set(0, 1.42, 0);
+  head.scale.set(1.1, 0.78, 0.9);
+  const earL = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.58, 4), shared.green);
+  earL.position.set(-0.43, 1.45, 0);
+  earL.rotation.z = Math.PI / 2;
+  const earR = earL.clone();
+  earR.position.x = 0.43;
+  earR.rotation.z = -Math.PI / 2;
+  const pack = makeBox(0.34, 0.58, 0.22, new THREE.MeshStandardMaterial({ color: 0x9b3226, roughness: 0.65 }), new THREE.Vector3(-0.36, 0.72, 0.07));
+  const bootL = makeBox(0.28, 0.15, 0.48, new THREE.MeshStandardMaterial({ color: 0x8d4d25, roughness: 0.88 }), new THREE.Vector3(-0.18, 0.08, 0.16));
+  const bootR = makeBox(0.28, 0.15, 0.48, new THREE.MeshStandardMaterial({ color: 0x8d4d25, roughness: 0.88 }), new THREE.Vector3(0.18, 0.08, 0.16));
+  player.group.add(body, head, earL, earR, pack, bootL, bootR);
+}
 
 function resetGame() {
-  state = {
-    player: { x: 640, y: 414, facing: 1, dashCooldown: 0, invulnerable: 0 },
-    tokens: tokenSeeds.map(([x, y]) => ({ x, y, taken: false, pulse: Math.random() * Math.PI * 2 })),
-    particles: [],
-    score: 0,
-    collected: 0,
-    timeLeft: 105,
-    status: "playing",
-    flash: 0,
-    startedAt: performance.now(),
-  };
+  state.score = 0;
+  state.collected = 0;
+  state.timeLeft = 105;
+  state.status = "playing";
+  state.startedAt = performance.now();
+  player.group.position.set(0, 0, 1.1);
+  player.dashCooldown = 0;
+  player.invulnerable = 0;
+  tokens.forEach((token) => {
+    token.visible = true;
+    token.userData.taken = false;
+  });
   setToast("Sniff out the compute", "Move with WASD or arrows. Dash with Shift. Avoid the audit beams.", false);
   updateHud();
 }
@@ -101,655 +465,150 @@ function update(delta) {
     setToast("The clock ate the hoard", "Press R to restart the run.", true);
   }
 
-  const player = state.player;
   let mx = 0;
-  let my = 0;
+  let mz = 0;
   if (keys.has("arrowleft") || keys.has("a")) mx -= 1;
   if (keys.has("arrowright") || keys.has("d")) mx += 1;
-  if (keys.has("arrowup") || keys.has("w")) my -= 1;
-  if (keys.has("arrowdown") || keys.has("s")) my += 1;
+  if (keys.has("arrowup") || keys.has("w")) mz -= 1;
+  if (keys.has("arrowdown") || keys.has("s")) mz += 1;
 
-  const mag = Math.hypot(mx, my) || 1;
-  const wantsDash = (keys.has("shift") || keys.has("shiftleft") || keys.has("shiftright")) && player.dashCooldown <= 0;
-  const dashing = wantsDash && (mx !== 0 || my !== 0);
-  const speed = dashing ? 520 : 252;
-
+  const length = Math.hypot(mx, mz) || 1;
+  const dashing = (keys.has("shift") || keys.has("shiftleft") || keys.has("shiftright")) && player.dashCooldown <= 0 && (mx || mz);
+  const speed = dashing ? 7.8 : 3.7;
   if (dashing) {
     player.dashCooldown = 0.48;
-    spawnBurst(player.x, player.y + 24, "#75ff66", 10);
+    spawnBurst(player.group.position, colors.green, 12);
   }
-
   player.dashCooldown = Math.max(0, player.dashCooldown - delta);
   player.invulnerable = Math.max(0, player.invulnerable - delta);
-  player.x = clamp(player.x + (mx / mag) * speed * delta, world.bounds.x + 38, world.bounds.x + world.bounds.width - 38);
-  player.y = clamp(player.y + (my / mag) * speed * delta, world.bounds.y + 52, world.bounds.y + world.bounds.height - 28);
-  if (mx !== 0) player.facing = Math.sign(mx);
 
-  for (const token of state.tokens) {
-    token.pulse += delta * 5;
-    if (!token.taken && distance(player, token) < 42) {
-      token.taken = true;
+  player.group.position.x = clamp(player.group.position.x + (mx / length) * speed * delta, worldBounds.minX, worldBounds.maxX);
+  player.group.position.z = clamp(player.group.position.z + (mz / length) * speed * delta, worldBounds.minZ, worldBounds.maxZ);
+  if (mx !== 0) {
+    player.facing = Math.sign(mx);
+    player.group.scale.x = player.facing;
+  }
+
+  updateTokens(delta);
+  updateBeams();
+  updateParticles(delta);
+
+  if (performance.now() - state.startedAt > 5600) toast.classList.add("is-quiet");
+  updateHud();
+}
+
+function updateTokens(delta) {
+  tokens.forEach((token) => {
+    token.userData.pulse += delta * 4.5;
+    token.rotation.y += delta * 1.8;
+    token.position.y = token.userData.baseY + Math.sin(token.userData.pulse) * 0.16;
+    if (!token.userData.taken && token.position.distanceTo(player.group.position) < 1.1) {
+      token.userData.taken = true;
+      token.visible = false;
       state.collected += 1;
       state.score += 900 + Math.ceil(state.timeLeft * 6);
-      spawnBurst(token.x, token.y, "#35f5ff", 24);
+      spawnBurst(token.position, colors.cyan, 24);
       setToast("Compute token pocketed", `${totalTokens - state.collected} tokens remain.`, false);
-
       if (state.collected === totalTokens) {
         state.status = "won";
         state.score += Math.ceil(state.timeLeft * 55);
         setToast("Hoard secured", "Every compute token is yours. Press R to run again.", true);
       }
     }
-  }
-
-  const now = performance.now() / 1000;
-  for (const beam of beams) {
-    const active = Math.sin(now * beam.speed + beam.phase) > -0.18;
-    if (active && player.invulnerable <= 0 && distanceToSegment(player.x, player.y, beam.x1, beam.y1, beam.x2, beam.y2) < 30) {
-      state.score = Math.max(0, state.score - 400);
-      state.timeLeft = Math.max(0, state.timeLeft - 5);
-      state.flash = 0.28;
-      player.invulnerable = 1.15;
-      spawnBurst(player.x, player.y, "#ff583f", 22);
-      setToast("Audited", "Five seconds burned. Watch the beam rhythm.", true);
-    }
-  }
-
-  if (performance.now() - state.startedAt > 5600) {
-    toast.classList.add("is-quiet");
-  }
-
-  state.flash = Math.max(0, state.flash - delta);
-  updateParticles(delta);
-  updateHud();
-}
-
-function updateParticles(delta) {
-  state.particles = state.particles.filter((p) => {
-    p.age += delta;
-    p.x += p.vx * delta;
-    p.y += p.vy * delta;
-    p.vx *= 0.96;
-    p.vy *= 0.96;
-    return p.age < p.life;
   });
 }
 
-function draw() {
-  ctx.clearRect(0, 0, world.width, world.height);
-  drawBackdrop();
-  drawFloor();
-  drawTokens();
-  drawBeams();
-  drawProps();
-  drawPlayer();
-  drawParticles();
-
-  if (state.flash > 0) {
-    ctx.fillStyle = `rgba(255, 88, 63, ${state.flash * 0.48})`;
-    ctx.fillRect(0, 0, world.width, world.height);
-  }
-}
-
-function drawBackdrop() {
-  const gradient = ctx.createRadialGradient(640, 330, 70, 640, 340, 760);
-  gradient.addColorStop(0, "#17391a");
-  gradient.addColorStop(0.58, "#08140c");
-  gradient.addColorStop(1, "#010302");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, world.width, world.height);
-
-  ctx.save();
-  ctx.globalAlpha = 0.92;
-  for (let i = 0; i < 40; i += 1) {
-    const x = 24 + i * 39;
-    const h = 84 + ((i * 47) % 170);
-    drawRockColumn(x, 92 + ((i * 31) % 86), h, 18 + (i % 3) * 8);
-  }
-  ctx.restore();
-
-  ctx.strokeStyle = "rgba(255, 186, 59, 0.16)";
-  ctx.lineWidth = 3;
-  for (let i = 0; i < 7; i += 1) {
-    const x = 106 + i * 176;
-    ctx.beginPath();
-    ctx.moveTo(x, 152 + (i % 3) * 14);
-    ctx.lineTo(x + 88, 108 + (i % 2) * 18);
-    ctx.stroke();
-  }
-}
-
-function drawFloor() {
-  ctx.save();
-  ctx.translate(0, 8);
-  drawEllipse(640, 390, 524, 240, "#102818", "#354f35");
-  drawEllipse(640, 390, 454, 193, "#19351e", "rgba(117, 255, 102, 0.18)");
-  drawMoss(640, 390, 508, 226);
-
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "rgba(109, 139, 102, 0.35)";
-  for (let ring = 0; ring < 5; ring += 1) {
-    ctx.beginPath();
-    ctx.ellipse(640, 390, 70 + ring * 49, 30 + ring * 23, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  for (let i = 0; i < 168; i += 1) {
-    const angle = (i * 137.5 * Math.PI) / 180;
-    const radius = 40 + (i % 16) * 30;
-    const x = 640 + Math.cos(angle) * radius * 1.45;
-    const y = 390 + Math.sin(angle) * radius * 0.64;
-    if (x < 110 || x > 1170 || y < 125 || y > 650) continue;
-    drawSlab(x, y, 30 + (i % 5) * 9, 16 + (i % 4) * 6, (i % 7) * 0.16);
-  }
-  drawRingPlatform(678, 333);
-  ctx.restore();
-}
-
-function drawTokens() {
-  for (const token of state.tokens) {
-    if (token.taken) continue;
-    const bob = Math.sin(token.pulse) * 7;
-    ctx.save();
-    ctx.translate(token.x, token.y + bob);
-    ctx.shadowColor = "#35f5ff";
-    ctx.shadowBlur = 23;
-    drawHex(0, 0, 28, "rgba(53, 245, 255, 0.32)", "#35f5ff");
-    drawHex(0, 0, 18, "rgba(7, 32, 34, 0.94)", "#9cffff");
-    ctx.strokeStyle = "#9cffff";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(-8, -2);
-    ctx.lineTo(0, -10);
-    ctx.lineTo(8, -2);
-    ctx.lineTo(0, 9);
-    ctx.closePath();
-    ctx.stroke();
-    ctx.restore();
-  }
-}
-
-function drawBeams() {
+function updateBeams() {
   const now = performance.now() / 1000;
-  for (const beam of beams) {
-    const active = Math.sin(now * beam.speed + beam.phase) > -0.18;
-    drawBeamPost(beam.x1, beam.y1);
-    drawBeamPost(beam.x2, beam.y2);
-    if (!active) continue;
-
-    ctx.save();
-    ctx.shadowColor = "#ffba3b";
-    ctx.shadowBlur = 20;
-    ctx.strokeStyle = "#ffba3b";
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(beam.x1, beam.y1);
-    for (let i = 1; i <= 8; i += 1) {
-      const t = i / 8;
-      const x = beam.x1 + (beam.x2 - beam.x1) * t;
-      const y = beam.y1 + (beam.y2 - beam.y1) * t + Math.sin(now * 14 + i) * 7;
-      ctx.lineTo(x, y);
+  beams.forEach((group) => {
+    const { a, b, phase, speed, beam, light } = group.userData;
+    const active = Math.sin(now * speed + phase) > -0.18;
+    beam.visible = active;
+    light.visible = active;
+    if (!active || player.invulnerable > 0) return;
+    if (distanceToSegment(player.group.position, a, b) < 0.52) {
+      state.score = Math.max(0, state.score - 400);
+      state.timeLeft = Math.max(0, state.timeLeft - 5);
+      player.invulnerable = 1.15;
+      spawnBurst(player.group.position, colors.red, 22);
+      setToast("Audited", "Five seconds burned. Watch the beam rhythm.", true);
     }
-    ctx.stroke();
-    ctx.restore();
+  });
+}
+
+function spawnBurst(position, color, count) {
+  for (let i = 0; i < count; i += 1) {
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.045 + Math.random() * 0.045, 8, 6), new THREE.MeshBasicMaterial({ color }));
+    mesh.position.copy(position);
+    mesh.position.y += 0.55;
+    const angle = Math.random() * Math.PI * 2;
+    mesh.userData = {
+      age: 0,
+      life: 0.55 + Math.random() * 0.45,
+      velocity: new THREE.Vector3(Math.cos(angle) * (1.2 + Math.random() * 2.2), 1.0 + Math.random() * 1.5, Math.sin(angle) * (1.2 + Math.random() * 2.2)),
+    };
+    particles.push(mesh);
+    scene.add(mesh);
   }
 }
 
-function drawProps() {
-  for (const prop of [...props].sort((a, b) => a.y - b.y)) {
-    if (prop.type === "terminal") drawTerminal(prop);
-    if (prop.type === "obelisk") drawObelisk(prop);
-    if (prop.type === "shrine") drawShrine(prop);
-    if (prop.type === "node") drawDataNode(prop);
-    if (prop.type === "crate") drawCrate(prop);
-    if (prop.type === "sign") drawSign(prop);
-    if (prop.type === "crystal") drawCrystal(prop);
-    if (prop.type === "plant") drawPlant(prop);
-    if (prop.type === "mushrooms") drawMushrooms(prop);
+function updateParticles(delta) {
+  for (let i = particles.length - 1; i >= 0; i -= 1) {
+    const particle = particles[i];
+    particle.userData.age += delta;
+    particle.userData.velocity.y -= 3.4 * delta;
+    particle.position.addScaledVector(particle.userData.velocity, delta);
+    particle.material.opacity = 1 - particle.userData.age / particle.userData.life;
+    particle.material.transparent = true;
+    if (particle.userData.age >= particle.userData.life) {
+      scene.remove(particle);
+      particles.splice(i, 1);
+    }
   }
 }
 
-function drawPlayer() {
-  const p = state.player;
-  const walk = performance.now() / 120;
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.scale(p.facing, 1);
-  ctx.globalAlpha = p.invulnerable > 0 && Math.floor(performance.now() / 80) % 2 === 0 ? 0.55 : 1;
-
-  ctx.fillStyle = "rgba(0, 0, 0, 0.38)";
-  ctx.beginPath();
-  ctx.ellipse(0, 35, 35, 12, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "#4e3221";
-  roundRect(-28, 5 + Math.sin(walk) * 2, 19, 37, 7);
-  roundRect(10, 5 - Math.sin(walk) * 2, 19, 37, 7);
-
-  ctx.fillStyle = "#8d4d25";
-  roundRect(-33, 31 + Math.sin(walk) * 2, 29, 13, 6);
-  roundRect(7, 31 - Math.sin(walk) * 2, 31, 13, 6);
-
-  ctx.fillStyle = "#68482d";
-  roundRect(-31, -36, 32, 50, 12);
-  ctx.fillStyle = "#27642c";
-  roundRect(-14, -45, 42, 61, 14);
-  ctx.fillStyle = "#70d458";
-  roundRect(-12, -70, 52, 45, 18);
-
-  ctx.beginPath();
-  ctx.moveTo(-13, -58);
-  ctx.lineTo(-51, -73);
-  ctx.lineTo(-20, -42);
-  ctx.closePath();
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(25, -58);
-  ctx.lineTo(63, -73);
-  ctx.lineTo(34, -42);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillStyle = "#06120b";
-  ctx.fillRect(-1, -56, 8, 6);
-  ctx.fillRect(24, -56, 8, 6);
-  ctx.strokeStyle = "#06120b";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(6, -40);
-  ctx.quadraticCurveTo(17, -34, 29, -42);
-  ctx.stroke();
-
-  ctx.fillStyle = "#9b3226";
-  roundRect(-44, -22, 23, 39, 7);
-  ctx.fillStyle = "#d8f0b7";
-  roundRect(-7, -24, 10, 30, 5);
-  ctx.restore();
-}
-
-function drawParticles() {
-  for (const p of state.particles) {
-    const alpha = 1 - p.age / p.life;
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.shadowColor = p.color;
-    ctx.shadowBlur = 12;
-    ctx.fillStyle = p.color;
-    ctx.fillRect(p.x, p.y, p.size, p.size);
-    ctx.restore();
-  }
-}
-
-function drawTerminal({ x, y, scale, label, side }) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(scale, scale);
-  ctx.rotate(side === "left" ? -0.08 : 0.08);
-  drawIsoBox(-58, -58, 116, 122, 24, "#27302c", "#121b18", "#070c08");
-  ctx.strokeStyle = "rgba(255, 186, 59, 0.42)";
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(-55, -40);
-  ctx.lineTo(-38, -57);
-  ctx.moveTo(42, -56);
-  ctx.lineTo(58, -38);
-  ctx.stroke();
-  ctx.fillStyle = "#06120b";
-  roundRect(-40, -38, 80, 66, 5);
-  ctx.fillStyle = "#75ff66";
-  ctx.shadowColor = "#75ff66";
-  ctx.shadowBlur = 9;
-  ctx.font = "10px Courier New";
-  if (label === "?") {
-    ctx.font = "42px Courier New";
-    ctx.fillText("?", -12, 10);
-  } else {
-    ctx.fillText("> SYS.OK", -30, -20);
-    ctx.fillText("> GRID.ONLINE", -30, -6);
-    ctx.fillText("> NODES: 42", -30, 8);
-    ctx.fillText("> PACKETS: 1203", -30, 22);
-    ctx.fillText(">_", -30, 44);
-  }
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = "#ffba3b";
-  for (let i = 0; i < 4; i += 1) {
-    ctx.fillRect(-40 + i * 18, 48, 10, 8);
-  }
-  drawIsoBox(-46, 60, 92, 18, 12, "#382710", "#1b1005", "#080604");
-  ctx.restore();
-}
-
-function drawObelisk({ x, y, scale }) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(scale, scale);
-  ctx.shadowColor = "#35f5ff";
-  ctx.shadowBlur = 28;
-  ctx.fillStyle = "rgba(53, 245, 255, 0.28)";
-  ctx.beginPath();
-  ctx.moveTo(0, -92);
-  ctx.lineTo(42, -46);
-  ctx.lineTo(28, 42);
-  ctx.lineTo(-28, 42);
-  ctx.lineTo(-42, -46);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = "#9cffff";
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  drawIsoBox(-56, 35, 112, 34, 18, "#24352f", "#1a2923", "#0b110d");
-  ctx.restore();
-}
-
-function drawShrine({ x, y, scale }) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(scale, scale);
-  drawIsoBox(-54, -34, 108, 82, 20, "#394339", "#1b241d", "#101611");
-  drawIsoBox(-38, -66, 76, 46, 15, "#50594c", "#263028", "#151b16");
-  ctx.fillStyle = "#ffba3b";
-  ctx.shadowColor = "#ffba3b";
-  ctx.shadowBlur = 12;
-  roundRect(-8, -24, 16, 44, 6);
-  ctx.shadowBlur = 0;
-  ctx.restore();
-}
-
-function drawDataNode({ x, y, scale }) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(scale, scale);
-  drawIsoBox(-28, -22, 56, 44, 13, "#22312d", "#111c18", "#07100b");
-  ctx.fillStyle = "#35f5ff";
-  ctx.shadowColor = "#35f5ff";
-  ctx.shadowBlur = 16;
-  roundRect(-16, -16, 32, 10, 4);
-  ctx.fillStyle = "#75ff66";
-  ctx.fillRect(-5, -2, 10, 10);
-  ctx.restore();
-}
-
-function drawCrate({ x, y, scale }) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(scale, scale);
-  drawIsoBox(-45, -38, 90, 82, 24, "#6b4a19", "#33230d", "#110d07");
-  ctx.strokeStyle = "#ffba3b";
-  ctx.lineWidth = 4;
-  ctx.strokeRect(-22, -12, 44, 32);
-  ctx.restore();
-}
-
-function drawSign({ x, y, scale, label }) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(scale, scale);
-  ctx.strokeStyle = "#4b331d";
-  ctx.lineWidth = 8;
-  ctx.beginPath();
-  ctx.moveTo(0, 18);
-  ctx.lineTo(0, 62);
-  ctx.stroke();
-  ctx.fillStyle = "#3a2a17";
-  roundRect(-52, -24, 104, 52, 4);
-  ctx.fillStyle = label === "DANGER" ? "#ff583f" : "#d5f2a7";
-  ctx.font = "15px Courier New";
-  ctx.textAlign = "center";
-  ctx.fillText(label, 0, 8);
-  ctx.textAlign = "start";
-  ctx.restore();
-}
-
-function drawPlant({ x, y, scale }) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(scale, scale);
-  ctx.shadowColor = "#75ff66";
-  ctx.shadowBlur = 12;
-  for (let i = 0; i < 8; i += 1) {
-    const angle = -Math.PI / 2 + (i - 3.5) * 0.27;
-    ctx.fillStyle = i % 2 ? "#5fff39" : "#2bbf34";
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(Math.cos(angle) * 20, Math.sin(angle) * 54);
-    ctx.lineTo(Math.cos(angle + 0.22) * 10, Math.sin(angle + 0.22) * 30);
-    ctx.closePath();
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
-function drawMushrooms({ x, y, scale }) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(scale, scale);
-  for (const cap of [
-    [-16, 8, 18],
-    [10, -2, 22],
-    [34, 10, 15],
-  ]) {
-    ctx.fillStyle = "#d9c46b";
-    roundRect(cap[0] - 4, cap[1] + 2, 8, 26, 4);
-    ctx.fillStyle = "#8b3b26";
-    ctx.beginPath();
-    ctx.ellipse(cap[0], cap[1], cap[2], cap[2] * 0.58, 0, Math.PI, 0);
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
-function drawCrystal({ x, y, scale }) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(scale, scale);
-  ctx.shadowColor = "#75ff66";
-  ctx.shadowBlur = 24;
-  ctx.fillStyle = "#45ff58";
-  ctx.beginPath();
-  ctx.moveTo(0, -68);
-  ctx.lineTo(25, -14);
-  ctx.lineTo(12, 35);
-  ctx.lineTo(-18, 35);
-  ctx.lineTo(-28, -12);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawRockColumn(x, y, h, w) {
-  ctx.fillStyle = "#101814";
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x + w, y + 14);
-  ctx.lineTo(x + w - 8, y + h);
-  ctx.lineTo(x - 18, y + h + 10);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = "rgba(117, 255, 102, 0.08)";
-  ctx.stroke();
-}
-
-function drawSlab(x, y, w, h, rotation) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(rotation);
-  ctx.fillStyle = "#526052";
-  ctx.strokeStyle = "#202d25";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.roundRect(-w / 2, -h / 2, w, h, 4);
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawEllipse(x, y, rx, ry, fill, stroke) {
-  ctx.fillStyle = fill;
-  ctx.strokeStyle = stroke;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-}
-
-function drawMoss(cx, cy, rx, ry) {
-  ctx.save();
-  ctx.fillStyle = "rgba(82, 154, 45, 0.42)";
-  for (let i = 0; i < 115; i += 1) {
-    const angle = (i * 2.399963) % (Math.PI * 2);
-    const radius = Math.sqrt((i * 37) % 1000) / Math.sqrt(1000);
-    const x = cx + Math.cos(angle) * rx * radius;
-    const y = cy + Math.sin(angle) * ry * radius;
-    if ((x - cx) ** 2 / rx ** 2 + (y - cy) ** 2 / ry ** 2 > 1) continue;
-    ctx.beginPath();
-    ctx.ellipse(x, y, 20 + (i % 5) * 7, 8 + (i % 4) * 4, (i % 8) * 0.3, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
-function drawRingPlatform(x, y) {
-  ctx.save();
-  ctx.translate(x, y);
-  for (let i = 5; i >= 0; i -= 1) {
-    ctx.strokeStyle = i % 2 ? "rgba(115, 132, 112, 0.7)" : "rgba(38, 54, 44, 0.9)";
-    ctx.lineWidth = 13;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 42 + i * 26, 17 + i * 12, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-  ctx.fillStyle = "#1b241f";
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 42, 20, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(207, 255, 196, 0.18)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(-28, -10);
-  ctx.lineTo(28, 10);
-  ctx.moveTo(28, -10);
-  ctx.lineTo(-28, 10);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawHex(x, y, radius, fill, stroke) {
-  ctx.fillStyle = fill;
-  ctx.strokeStyle = stroke;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  for (let i = 0; i < 6; i += 1) {
-    const angle = Math.PI / 6 + (Math.PI * 2 * i) / 6;
-    const px = x + Math.cos(angle) * radius;
-    const py = y + Math.sin(angle) * radius;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-}
-
-function drawBeamPost(x, y) {
-  drawIsoBox(x - 24, y - 18, 48, 36, 16, "#4b371d", "#251807", "#0d0904");
-  ctx.fillStyle = "#ffba3b";
-  ctx.fillRect(x - 9, y - 15, 18, 11);
-}
-
-function drawIsoBox(x, y, w, h, depth, top, side, front) {
-  ctx.fillStyle = side;
-  ctx.beginPath();
-  ctx.moveTo(x + w, y);
-  ctx.lineTo(x + w + depth, y + depth);
-  ctx.lineTo(x + w + depth, y + h + depth);
-  ctx.lineTo(x + w, y + h);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillStyle = front;
-  ctx.beginPath();
-  ctx.rect(x, y + depth, w, h);
-  ctx.fill();
-
-  ctx.fillStyle = top;
-  ctx.beginPath();
-  ctx.moveTo(x, y + depth);
-  ctx.lineTo(x + depth, y);
-  ctx.lineTo(x + w + depth, y);
-  ctx.lineTo(x + w, y + depth);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.strokeStyle = "rgba(207, 255, 196, 0.15)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-}
-
-function roundRect(x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.roundRect(x, y, w, h, r);
-  ctx.fill();
+function distanceToSegment(point, a, b) {
+  const ab = b.clone().sub(a);
+  const ap = point.clone().sub(a);
+  const t = clamp(ap.dot(ab) / ab.lengthSq(), 0, 1);
+  return point.distanceTo(a.clone().addScaledVector(ab, t));
 }
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function distance(a, b) {
-  return Math.hypot(a.x - b.x, a.y - b.y);
+function resize() {
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  if (canvas.width !== width || canvas.height !== height) renderer.setSize(width, height, false);
+  const aspect = width / Math.max(height, 1);
+  const frustum = 5.45;
+  camera.left = -frustum * aspect;
+  camera.right = frustum * aspect;
+  camera.top = frustum;
+  camera.bottom = -frustum;
+  camera.updateProjectionMatrix();
 }
 
-function distanceToSegment(px, py, ax, ay, bx, by) {
-  const vx = bx - ax;
-  const vy = by - ay;
-  const wx = px - ax;
-  const wy = py - ay;
-  const c = clamp((wx * vx + wy * vy) / (vx * vx + vy * vy), 0, 1);
-  const x = ax + vx * c;
-  const y = ay + vy * c;
-  return Math.hypot(px - x, py - y);
-}
-
-function spawnBurst(x, y, color, count) {
-  for (let i = 0; i < count; i += 1) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 45 + Math.random() * 170;
-    state.particles.push({
-      x,
-      y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      life: 0.7 + Math.random() * 0.4,
-      age: 0,
-      color,
-      size: 2 + Math.random() * 4,
-    });
-  }
-}
-
-function loop(now) {
-  const delta = Math.min(0.033, (now - lastFrame) / 1000);
-  lastFrame = now;
+function loop() {
+  const delta = Math.min(0.033, clock.getDelta());
+  resize();
   update(delta);
-  draw();
+  renderer.render(scene, camera);
   requestAnimationFrame(loop);
 }
 
 window.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
-  if (["arrowleft", "arrowright", "arrowup", "arrowdown", " ", "shift"].includes(key)) {
-    event.preventDefault();
-  }
+  if (["arrowleft", "arrowright", "arrowup", "arrowdown", " ", "shift"].includes(key)) event.preventDefault();
   if (key === "r") resetGame();
   keys.add(key);
 });
 
-window.addEventListener("keyup", (event) => {
-  keys.delete(event.key.toLowerCase());
-});
-
+window.addEventListener("keyup", (event) => keys.delete(event.key.toLowerCase()));
 restart.addEventListener("click", resetGame);
 
+setupWorld();
 resetGame();
 requestAnimationFrame(loop);

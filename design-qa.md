@@ -8,14 +8,14 @@ Prototype checked: local static preview at `http://127.0.0.1:8788/`
 
 - HUD: Updated from three generic readouts to a five-panel CRT header with single-line title, score, tokens, time, and CPU signal panel.
 - Goal count: Updated from 12 to 15 compute tokens to match the reference.
-- World density: Added layered isometric slabs, circular platform rings, moss patches, wall shards, cables, plants, terminal monuments, shrine block, crystal obelisk, data node, warning signs, and chunkier audit-beam machinery.
+- World density: Added layered Three.js slabs, circular platform rings, moss patches, wall shards, plants, terminal monuments, shrine block, crystal obelisk, data node, warning signs, and chunkier audit-beam machinery.
 - Collectibles and hazards: Cyan compute tokens and orange audit beams remain interactive and visually closer to the render.
 - Bottom controls: Rebuilt as six CRT command panels: move, dash, avoid, collect, directive, and restart.
 - Responsive state: Desktop matches the reference target most closely. Mobile fits without horizontal overflow, but the art direction is intentionally optimized for a wide desktop game viewport.
 
 ## Intentional Deviation
 
-The objects are custom canvas-rendered game objects instead of pasted/generated bitmap sprites. This keeps the game interactive, dependency-free, and editable while moving the art direction toward the supplied render.
+The objects are custom Three.js meshes instead of pasted/generated bitmap sprites. This keeps the game interactive, build-free, and editable while moving the art direction toward the supplied render.
 
 ## Verification
 

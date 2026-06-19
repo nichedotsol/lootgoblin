@@ -1,6 +1,6 @@
 # Loot Goblin
 
-A tiny browser minigame about hunting compute tokens in a cursed terminal ruin.
+A tiny Three.js browser minigame about hunting compute tokens in a cursed terminal ruin.
 
 ## Play
 
@@ -18,8 +18,9 @@ Collect all 15 compute tokens before time runs out. Audit beams burn time and sc
 
 ## Tech
 
-This first version is intentionally static and dependency-free:
+This version is intentionally static and build-free:
 
 - HTML/CSS app shell
-- Canvas-rendered 2.5D world, props, player, hazards, particles, and collectibles
+- Three.js-rendered 3D world, props, player, hazards, particles, and collectibles
+- Three.js loaded as an ES module from jsDelivr
 - No build step

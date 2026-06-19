@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Loot Goblin is a small browser minigame about hunting compute tokens in a cursed terminal ruin."
+      content="Loot Goblin is a Three.js minigame about hunting compute tokens in a cursed terminal ruin."
     />
     <title>Loot Goblin</title>
     <link rel="stylesheet" href="./styles.css" />
@@ -35,12 +35,12 @@
           </div>
           <div class="meter signal-meter">
             <span>CPU OK</span>
-            <strong aria-hidden="true">⌁─╱╲─•─•</strong>
+            <strong aria-hidden="true">--/\--o-o</strong>
           </div>
         </header>
 
         <div class="screen">
-          <canvas id="game" width="1280" height="720" aria-label="Playable game arena"></canvas>
+          <canvas id="game" width="1280" height="720" aria-label="Playable Three.js game arena"></canvas>
           <div class="crt-lines" aria-hidden="true"></div>
           <div class="crt-vignette" aria-hidden="true"></div>
           <div class="toast" id="toast" role="status" aria-live="polite">
@@ -50,7 +50,7 @@
         </div>
 
         <footer class="control-bar" aria-label="Controls">
-          <div class="keys move-keys"><span>Move</span><kbd>↑</kbd><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div>
+          <div class="keys move-keys"><span>Move</span><kbd>Up</kbd><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div>
           <div class="keys"><span>Dash</span><kbd>Shift</kbd></div>
           <div class="keys"><span>Avoid</span><span class="skull" aria-hidden="true"></span><small>Zaps</small></div>
           <div class="keys"><span>Collect</span><span class="token-icon" aria-hidden="true"></span><small>Tokens</small></div>
@@ -60,6 +60,6 @@
       </section>
     </main>
 
-    <script src="./src/game.js"></script>
+    <script type="module" src="./src/game.js"></script>
   </body>
 </html>
